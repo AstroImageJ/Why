@@ -103,7 +103,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             // Todo this is a hack to avoid closing the program
             loop {
                 std::hint::spin_loop();
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                std::thread::sleep(std::time::Duration::MAX);
             }
         } else {
             if let Err(e) = maybe_env {
