@@ -5,12 +5,32 @@ use std::path::{Path};
 use config::{Config, FileFormat};
 
 pub struct LauncherConfig {
+    /// key: jvm_install; format: String (path), can be relative by preceding with './';
+    /// what it does: the path to the location of the jvm.dll -
+    /// it will recursively search into this path uo to a depth of 4 for the jvm.dll
+    /// REQUIRED if allows_system_java and allows_java_lookup are disabled
     pub jvm_path: Option<String>,
+    /// key: mainclass; format: String, can be relative by preceding with './';
+    /// what it does: the main class, as it would appear in a jar manifest
+    /// REQUIRED
     pub main_class: Option<String>,
+    /// key: launch_options; format: String (path), can be relative by preceding with './';
+    /// what it does: the Launch4J-style config to read JVM options from
     pub launch_options_file: Option<String>,
+    /// key: classpath; format: same as the launch argument - ';' separated paths;
+    /// what it does: sets the classpath; If given a jar, it will respect the jar
+    /// manifest's classpath entry
+    /// REQUIRED
     pub classpath: Option<String>,
+    /// key: min_java; format: integer; what it does: only tries to run Java that is
+    /// equal to or greater than this Java version
     pub min_java: Option<i64>,
+    /// key: allow_system_java; format: boolean; what it does: whether the launcher
+    /// should use the Java listed in JAVA_HOME
     pub allows_system_java: bool,
+    /// key: allow_java_location_lookup; format: boolean;
+    /// what it does: whether the launcher should check common Java
+    /// installation directories for a Java install
     pub allows_java_location_lookup: bool
 }
 
