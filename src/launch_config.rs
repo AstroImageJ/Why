@@ -4,6 +4,7 @@ use std::io::BufRead;
 use std::path::{Path};
 use config::{Config, FileFormat};
 
+/// These are read in from launcher.ini from the current working directory
 pub struct LauncherConfig {
     /// key: jvm_install; format: String (path), can be relative by preceding with './';
     /// what it does: the path to the location of the jvm.dll -
