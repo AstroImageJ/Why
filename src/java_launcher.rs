@@ -115,8 +115,16 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     } else {
         if had_jvm_path {
             // String formatting? What's that?
-            message(&("A valid Java installation was found but it was tool old.\n\
-            Please install Java ".to_owned() + &launch_opts.config.min_java.unwrap_or(0).to_string() + &" or newer".to_owned()))
+            let version = launch_opts.config.min_java.unwrap_or(0);
+            let mut inst = "any Java.".to_owned();
+            if version > 0 {
+                let mut x = "Java ".to_owned();
+                x.push_str(version.to_string().as_str());
+                x.push_str(" or newer.");
+                inst = x.clone();
+            }
+            message(&("A valid Java installation was found but it was too old.\n\
+            Please install ".to_owned() + inst.as_str()))
         } else {
             message("Failed to find a valid Java installation and giving up.\n\
             Please contact the developers or install a valid version of Java.")
