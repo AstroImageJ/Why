@@ -11,7 +11,7 @@ pub struct LauncherConfig {
     /// it will recursively search into this path uo to a depth of 4 for the jvm.dll
     /// REQUIRED if allows_system_java and allows_java_lookup are disabled
     pub jvm_path: Option<String>,
-    /// key: mainclass; format: String, can be relative by preceding with './';
+    /// key: mainclass; format: String (as it would appear in a jar manifest);
     /// what it does: the main class, as it would appear in a jar manifest
     /// REQUIRED
     pub main_class: Option<String>,
