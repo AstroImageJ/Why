@@ -9,6 +9,7 @@ pub struct LauncherConfig {
     pub main_class: Option<String>,
     pub launch_options_file: Option<String>,
     pub classpath: Option<String>,
+    pub min_java: Option<i64>,
     pub allows_system_java: bool,
     pub allows_java_location_lookup: bool
 }
@@ -31,6 +32,7 @@ impl LauncherConfig {
                 main_class: c.get_string("mainclass").ok(),
                 classpath: c.get_string("classpath").ok(),
                 jvm_path: c.get_string("jvm_install").ok(),
+                min_java: c.get_int("min_java").ok(),
                 launch_options_file: c.get_string("launch_options").ok(),
                 allows_system_java: c.get_bool("allow_system_java").unwrap_or(true),
                 allows_java_location_lookup: c.get_bool("allow_java_location_lookup").unwrap_or(true),
@@ -82,6 +84,7 @@ impl Default for LauncherConfig {
             jvm_path: None,
             main_class: None,
             classpath: None,
+            min_java: None,
             launch_options_file: None,
             allows_system_java: true,
             allows_java_location_lookup: true

@@ -22,11 +22,12 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     }
 
     let mut jvm_path: Option<PathBuf> = None;
+    let mut had_jvm_path = false;
     if let Some(paths) = get_jvm_paths(launch_opts) {
         // Try and validate Java version -
         // if no valid version is found, and a version check failed, try using that one
         for p in paths {
-            if let Some(is_compat) = compatible_java_version(&p, 8) {
+            if let Some(is_compat) = compatible_java_version(&p, launch_opts.config.min_java.unwrap_or(0) as i32) {
                 if is_compat {
                     println!("Found valid java!");
                     jvm_path = Some(p);
@@ -34,7 +35,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             } else {
                 jvm_path = Some(p);
             }
-
+            had_jvm_path = true;
         }
     } else {
         message("Failed to find a valid Java installation.\n\
@@ -112,8 +113,14 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             }
         }
     } else {
-        message("Failed to find a valid Java installation and giving up.\n\
-        Please contact the developers or install a valid version of Java.")
+        if had_jvm_path {
+            // String formatting? What's that?
+            message(&("A valid Java installation was found but it was tool old.\n\
+            Please install Java ".to_owned() + &launch_opts.config.min_java.unwrap_or(0).to_string() + &" or newer".to_owned()))
+        } else {
+            message("Failed to find a valid Java installation and giving up.\n\
+            Please contact the developers or install a valid version of Java.")
+        }
     }
 }
 
