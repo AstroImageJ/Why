@@ -4,6 +4,16 @@ use std::io::BufRead;
 use std::path::{Path};
 use config::{Config, FileFormat};
 
+/// These module paths must be in the form of opt=value
+const MODULE_OPTS: &'static [&str] = &["--add-reads", "--add-exports", "--add-opens",
+    "--add-modules", "--limit-modules", "--module-path",
+    "--patch-module", "--upgrade-module-path"];
+
+/// The options must match the form accepted by the JVM, otherwise a crash will occur
+/// This is only a sampling of commonly used ones to prevent user error.
+/// These options are assumed to contain numbers
+const STANDARD_OPTS: &'static [&str] = &["-Xmx", "-Xms"];
+
 /// These are read in from launcher.ini from the current working directory
 pub struct LauncherConfig {
     /// key: jvm_install; format: String (path), can be relative by preceding with './';
@@ -33,6 +43,20 @@ pub struct LauncherConfig {
     /// what it does: whether the launcher should check common Java
     /// installation directories for a Java install
     pub allows_java_location_lookup: bool
+}
+
+impl Default for LauncherConfig {
+    fn default() -> Self {
+        LauncherConfig {
+            jvm_path: None,
+            main_class: None,
+            classpath: None,
+            min_java: None,
+            launch_options_file: None,
+            allows_system_java: true,
+            allows_java_location_lookup: true
+        }
+    }
 }
 
 impl LauncherConfig {
@@ -71,7 +95,10 @@ impl LauncherConfig {
                 // Consumes the iterator, returns an (Optional) String
                 for line in lines {
                     if let Ok(ip) = line {
-                        out.append(&mut parse_line(ip))
+                        let sanitized_line = verify_line(ip);
+                        let mut opts = parse_line(sanitized_line).iter()
+                            .map(|o| verify_opt(o.to_owned())).collect();
+                        out.append(&mut opts)
                     }
                 }
             }
@@ -93,23 +120,36 @@ pub fn parse_line(line: String) -> Vec<String> {
     out
 }
 
+fn verify_opt(input: String) -> String {
+    for opt in STANDARD_OPTS {
+        if input.starts_with(opt) {
+            let numeral_part = &input[opt.len()..];
+            if let Some(b) = numeral_part.chars().next().and_then(|c| Some(c.is_numeric())) {
+                if b {
+                    return input;
+                }
+            }
+            println!("Launcher rejected a launch option ({}) due to incorrect format.", input);
+            return "".to_string();
+        }
+    }
+    input
+}
+
+/// Handle verification of args with spaces
+fn verify_line(mut line: String) -> String {
+    for opt in MODULE_OPTS {
+        if line.contains((opt.to_string() + " ").as_str()) {
+            println!("Launcher corrected a module option ({})! They must be in the form of opt=val.", opt)
+        }
+        line = line.replace((opt.to_string() + " ").as_str(), (opt.to_string() + "=").as_str());
+    }
+    line
+}
+
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     where P: AsRef<Path>, {
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
-}
-
-impl Default for LauncherConfig {
-    fn default() -> Self {
-        LauncherConfig {
-            jvm_path: None,
-            main_class: None,
-            classpath: None,
-            min_java: None,
-            launch_options_file: None,
-            allows_system_java: true,
-            allows_java_location_lookup: true
-        }
-    }
 }
 
