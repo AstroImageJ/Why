@@ -22,6 +22,3 @@ opt-level = "z"  # Optimize for size.
 lto = true # instructs the linker to optimize at the link stage. This can, for example, remove dead code and often times reduces binary size.
 codegen-units = 1 # Slower, but more optimization?
 panic = "abort" # No helpful stacktrace on panic
-
-# todo see compress and tools and potential other opti: https://github.com/johnthagen/min-sized-rust#compress-the-binary
-#     compile libstd w/ opti?
