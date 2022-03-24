@@ -17,7 +17,7 @@ fn main() {
     correct_directory();
 
     // todo comment when publishing
-    //std::env::set_current_dir("./test");
+    //std::env::set_current_dir("./../../test");
 
     launch();
 }

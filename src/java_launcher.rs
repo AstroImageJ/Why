@@ -43,6 +43,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 if is_compat {
                     println!("Found valid java!");
                     jvm_path = Some(p);
+                    break
                 }
             } else {
                 jvm_path = Some(p);
