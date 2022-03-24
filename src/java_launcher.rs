@@ -49,78 +49,42 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     }
 
     // The launch attempt
-    if let Some(jvm_path) = jvm_path {
-        // This is needed for the lookup passed to with_libjvm
-        let path_getter = || {
-            Ok(jvm_path.as_path())
-        };
-
-        // Create JVM arguments
-        let args = make_jvm_args(launch_opts);
-        if args.is_err() {
-            message("Failed to create JVM arguments.\n\
-            Please contact the developers or undo any changes to the configuration.");
-            return;
-        }
-
-        // Create a new VM
-        let maybe_jvm = JavaVM::with_libjvm(args.unwrap(), path_getter);
-        let jvm = match maybe_jvm {
-            Ok(vm) => {vm}
-            Err(e) => {
-                println!("{}", e);
-                if !launch_opts.config.allows_system_java {
-                    message("Failed to load Java from the searched paths.\n\
-                    Please contact the developers.");
-                    return;
-                }
-                // Fallback to system Java, this skips Java version check
-                let maybe_jvm = JavaVM::new(make_jvm_args(launch_opts).unwrap());
-                match maybe_jvm {
-                    Ok(vm) => {vm}
-                    Err(_) => {
-                        message("Failed to load Java from the searched paths and failed again \
-                        when trying the installation at JAVA_HOME.\n\
-                        Please contact the developers.");
-                        return;
-                    }
-                }
-            }
-        };
-
+    if let Some(jvm) = try_launch_jvm(jvm_path, launch_opts) {
         // Attach the current thread to call into Java
         // This method returns the guard that will detach the current thread when dropped,
         // also freeing any local references created in it
         let maybe_env = jvm.attach_current_thread_as_daemon();
-        if let Ok(env) = maybe_env {
 
-            // Convert program args for forwarding
-            let opts: Vec<JValue> = launch_opts.program_opts.iter()
-                .map(|s| env.new_string(s)) // Convert to JString (maybe)
-                .filter(|m| m.is_ok()).map(|m| m.unwrap())// Remove invalid JStrings
-                .map(|s| JValue::Object(*s)).collect(); // Convert to something usable
+        // Starting the app
+        match maybe_env {
+            Ok(env) => {
+                // Convert program args for forwarding
+                let opts: Vec<JValue> = launch_opts.program_opts.iter()
+                    .map(|s| env.new_string(s)) // Convert to JString (maybe)
+                    .filter(|m| m.is_ok()).map(|m| m.unwrap())// Remove invalid JStrings
+                    .map(|s| JValue::Object(*s)).collect(); // Convert to something usable
 
-            // Ensure correct format of main class
-            let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
+                // Ensure correct format of main class
+                let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
 
-            // Call main method
-            let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &opts[..]);
+                // Call main method
+                let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &opts[..]);
 
-            if let Err(e) = v {
-                println!("{}", e);
-                message("Failed to start the app, the classname was invalid or \
-                not on the classpath, or the main method could not be found.\n\
-                Please contact the developers.");
-                return;
+                if let Err(e) = v {
+                    println!("{}", e);
+                    message("Failed to start the app, the classname was invalid or \
+                    not on the classpath, or the main method could not be found.\n\
+                    Please contact the developers.");
+                    return;
+                }
+
+                // This hangs and waits for all Java threads to close before shutting down
+                // Also keeps the JVM open, without this we immediately shut down
+                if let Ok(j) = env.get_java_vm() { // This gets around ownership issues
+                    close_jvm(j);
+                }
             }
-
-            // This hangs and waits for all Java threads to close before shutting down
-            // Also keeps the JVM open, without this we immediately shut down
-            if let Ok(j) = env.get_java_vm() { // This gets around ownership issues
-                close_jvm(j);
-            }
-        } else {
-            if let Err(e) = maybe_env {
+            Err(e) => {
                 println!("{}", e);
                 message("Java successfully started, but failed to attach to it and therefore cannot proceed.\n\
                 Please contact the developers.")
@@ -146,6 +110,58 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         } else {
             message("Failed to find a valid Java installation and giving up.\n\
             Please contact the developers or install a valid version of Java.")
+        }
+    }
+}
+
+/// Create the JVM if possible
+fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
+    if let Some(jvm_path) = jvm_path {
+        // This is needed for the lookup passed to with_libjvm
+        let path_getter = || {
+            Ok(jvm_path.as_path())
+        };
+
+        // Create JVM arguments
+        let args = make_jvm_args(launch_opts);
+        if args.is_err() {
+            message("Failed to create JVM arguments.\n\
+            Please contact the developers or undo any changes to the configuration.");
+            return None;
+        }
+
+        // Create a new VM
+        let maybe_jvm = JavaVM::with_libjvm(args.unwrap(), path_getter);
+        return match maybe_jvm {
+            Ok(vm) => { Some(vm) }
+            Err(e) => {
+                println!("{}", e);
+                // Fallback to system Java, Java version is not verified
+                try_load_system_java(launch_opts)
+            }
+        };
+    } else {
+        // Fallback to system Java, Java version is not verified
+        return try_load_system_java(launch_opts)
+    }
+}
+
+/// Tries to create JVM from system Java, checking if the launch options allow it
+fn try_load_system_java(launch_opts: &LaunchOpts) -> Option<JavaVM> {
+    if !launch_opts.config.allows_system_java {
+        message("Failed to load Java from the searched paths.\n\
+                    Please contact the developers.");
+        return None;
+    }
+
+    let maybe_jvm = JavaVM::new(make_jvm_args(launch_opts).unwrap());
+    return match maybe_jvm {
+        Ok(vm) => { Some(vm) }
+        Err(_) => {
+            message("Failed to load Java from the searched paths and failed again \
+                        when trying the installation at JAVA_HOME.\n\
+                        Please contact the developers.");
+            None
         }
     }
 }
@@ -213,6 +229,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     let mut jvm_paths: Vec<PathBuf> = vec![];
 
     match &launch_opts.config.jvm_path {
+        // Search current directory
         None => {
             if let Ok(c_dir) = std::env::current_dir() {
                 let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), "jvm.dll"));
@@ -221,6 +238,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
                 }
             }
         }
+        // Search specified directory
         Some(path_str) => {
             //todo not just windows, but not me
             let p = valid_path(find_file(path_str, "jvm.dll"));
@@ -230,6 +248,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         }
     }
 
+    // Search fallback locations
     if launch_opts.config.allows_java_location_lookup {
         for loc in JVM_LOC_QUERIES.iter() {
             let p = valid_path(find_file(loc, "jvm.dll"));
