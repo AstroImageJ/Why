@@ -95,17 +95,22 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         close_jvm(jvm)
     } else {
         // Error messages
-        // String formatting? What's that?
-        let version = launch_opts.config.min_java.unwrap_or(0);
-        let mut inst = "any Java.".to_owned();
-        if version > 0 {
-            let mut x = "Java ".to_owned();
-            x.push_str(version.to_string().as_str());
-            x.push_str(" or newer.");
-            inst = x.clone();
-        }
-        message(&("A missing or older Java installation was found.\n\
+        if !had_jvm_path {
+            // String formatting? What's that?
+            let version = launch_opts.config.min_java.unwrap_or(0);
+            let mut inst = "any Java.".to_owned();
+            if version > 0 {
+                let mut x = "Java ".to_owned();
+                x.push_str(version.to_string().as_str());
+                x.push_str(" or newer.");
+                inst = x.clone();
+            }
+            message(&("A missing or older Java installation was found.\n\
                         Please install ".to_owned() + inst.as_str()))
+        } else {
+            message("Java failed to start. Please check the launch options,\n\
+                    an invalid option was likely used and could not be automatically recovered.")
+        }
     }
 }
 
