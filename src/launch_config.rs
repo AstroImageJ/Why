@@ -18,7 +18,7 @@ const STANDARD_OPTS: &'static [&str] = &["-Xmx", "-Xms"];
 pub struct LauncherConfig {
     /// key: jvm_install; format: String (path), can be relative by preceding with './';
     /// what it does: the path to the location of the jvm.dll -
-    /// it will recursively search into this path uo to a depth of 4 for the jvm.dll
+    /// it will recursively search into this path up to a depth of 4 for the jvm.dll
     /// REQUIRED if allows_system_java and allows_java_lookup are disabled
     pub jvm_path: Option<String>,
     /// key: mainclass; format: String (as it would appear in a jar manifest);

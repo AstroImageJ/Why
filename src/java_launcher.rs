@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use config::{Config, FileFormat};
 use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError};
 use jni::objects::JValue;
+use jni::sys::{jint, JNIInvokeInterface_};
 use walkdir::{DirEntry, WalkDir};
 use crate::launch_config::LauncherConfig;
 use crate::message;
@@ -112,6 +113,8 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 Please contact the developers.")
             }
         }
+
+        close_jvm(jvm)
     } else {
         if had_jvm_path {
             // String formatting? What's that?
@@ -132,9 +135,15 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     }
 }
 
-/*fn close_jvm(jvm: JavaVM) {
-    (*jvm.get_java_vm_pointer()).DestroyJavaVM();
-}*/
+fn close_jvm(jvm: JavaVM) {
+    unsafe {
+        let f : Option<unsafe extern "system" fn(*mut *const JNIInvokeInterface_) -> jint> =
+            (*(*jvm.get_java_vm_pointer())).DestroyJavaVM;
+        if let Some(func) = f {
+            func(jvm.get_java_vm_pointer());
+        }
+    }
+}
 
 fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
     // First we go up 3 levels from jvm.dll path to get runtime info
