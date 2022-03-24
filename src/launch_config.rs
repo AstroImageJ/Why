@@ -4,6 +4,7 @@ use std::io::BufRead;
 use std::path::Path;
 
 use config::{Config, FileFormat};
+use sysinfo::{System, SystemExt};
 
 /// These module paths must be in the form of opt=value
 const MODULE_OPTS: &'static [&str] = &["--add-reads", "--add-exports", "--add-opens",
@@ -44,6 +45,9 @@ pub struct LauncherConfig {
     /// what it does: whether the launcher should check common Java
     /// installation directories for a Java install
     pub allows_java_location_lookup: bool,
+    /// key: maximum_heap_percentage; format: integer;
+    /// what it does: sets the -Xmx to this value if missing from the launch args.
+    pub max_mem_percent: Option<i64>,
 }
 
 /// Sets the defaults
@@ -54,6 +58,7 @@ impl Default for LauncherConfig {
             main_class: None,
             classpath: None,
             min_java: None,
+            max_mem_percent: None,
             launch_options_file: None,
             allows_system_java: true,
             allows_java_location_lookup: true,
@@ -81,6 +86,7 @@ impl LauncherConfig {
                 launch_options_file: c.get_string("launch_options").ok(),
                 allows_system_java: c.get_bool("allow_system_java").unwrap_or(true),
                 allows_java_location_lookup: c.get_bool("allow_java_location_lookup").unwrap_or(true),
+                max_mem_percent: c.get_int("maximum_heap_percentage").ok(),
                 ..Default::default()
             }
         } else {
@@ -103,6 +109,13 @@ impl LauncherConfig {
                         out.append(&mut opts)
                     }
                 }
+            }
+        }
+
+        if let Some(mem_per) = self.max_mem_percent {
+            let has_xmx = out.iter().any(|s| s.starts_with("-Xmx"));
+            if !has_xmx {
+                out.push(format!("-Xmx{}kb", get_max_heap(mem_per)))
             }
         }
 
@@ -156,5 +169,17 @@ fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     where P: AsRef<Path>, {
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
+}
+
+/// Gets the maximum ram on this system in kb
+fn get_max_heap(mem_per: i64) -> u64 {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    let max_mem = sys.total_memory();
+    let mut mem_frac: f64 = ((mem_per as f64) / 100f64);
+    if mem_frac <= 0.01f64 || mem_frac >= 1f64 {
+        mem_frac = 0.2f64;
+    }
+    ((max_mem as f64) * mem_frac) as u64
 }
 
