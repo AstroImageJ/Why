@@ -88,10 +88,18 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         // also freeing any local references created in it
         let maybe_env = jvm.attach_current_thread_as_daemon();
         if let Ok(env) = maybe_env {
-            //todo actually pass in args
-            let v = env.call_static_method(launch_opts.config.main_class.as_ref().unwrap().replace(".", "/"), "main", "([Ljava/lang/String;)V", &[
-                JValue::Object(*env.new_string("").unwrap())
-            ]);
+
+            // Convert program args for forwarding
+            let opts: Vec<JValue> = launch_opts.program_opts.iter()
+                .map(|s| env.new_string(s)) // Convert to JString (maybe)
+                .filter(|m| m.is_ok()).map(|m| m.unwrap())// Remove invalid JStrings
+                .map(|s| JValue::Object(*s)).collect(); // Convert to something usable
+
+            // Ensure correct format
+            let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
+
+            // Call main method
+            let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &opts[..]);
 
             if let Err(e) = v {
                 println!("{}", e);
@@ -133,6 +141,12 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             Please contact the developers or install a valid version of Java.")
         }
     }
+}
+
+fn convert_opts<T, const N: usize>(v: Vec<T>) -> [T; N] {
+    use std::convert::TryInto;
+    v.try_into()
+        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
 }
 
 fn close_jvm(jvm: JavaVM) {
