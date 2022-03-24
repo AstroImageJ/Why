@@ -15,15 +15,19 @@ pub struct LaunchOpts {
     pub program_opts: Vec<String>,
 }
 
+/// Create the JVM, attach to it, and run the `main` method of the given `launch_opts`.<br>
+/// Blocks until the JVM has shut down.
 pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
+    // Not enough information provided in the launcher config
     if !launch_opts.config.validate() {
         message("Invalid launcher config.\n\
         Please contact the developers.");
         return;
     }
 
+    // Try and find a valid JVM outside of `JAVA_HOME`
     let mut jvm_path: Option<PathBuf> = None;
-    let mut had_jvm_path = false;
+    let mut had_jvm_path = false; // Used for error message output
     if let Some(paths) = get_jvm_paths(launch_opts) {
         // Try and validate Java version -
         // if no valid version is found, and a version check failed, try using that one
@@ -44,12 +48,14 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         return;
     }
 
+    // The launch attempt
     if let Some(jvm_path) = jvm_path {
-        // This is needed for the lookup
+        // This is needed for the lookup passed to with_libjvm
         let path_getter = || {
             Ok(jvm_path.as_path())
         };
 
+        // Create JVM arguments
         let args = make_jvm_args(launch_opts);
         if args.is_err() {
             message("Failed to create JVM arguments.\n\
@@ -68,6 +74,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                     Please contact the developers.");
                     return;
                 }
+                // Fallback to system Java, this skips Java version check
                 let maybe_jvm = JavaVM::new(make_jvm_args(launch_opts).unwrap());
                 match maybe_jvm {
                     Ok(vm) => {vm}
@@ -81,9 +88,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             }
         };
 
-        // Attach the current thread to call into Java — see extra options in
-        // "Attaching Native Threads" section.
-        //
+        // Attach the current thread to call into Java
         // This method returns the guard that will detach the current thread when dropped,
         // also freeing any local references created in it
         let maybe_env = jvm.attach_current_thread_as_daemon();
@@ -95,7 +100,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 .filter(|m| m.is_ok()).map(|m| m.unwrap())// Remove invalid JStrings
                 .map(|s| JValue::Object(*s)).collect(); // Convert to something usable
 
-            // Ensure correct format
+            // Ensure correct format of main class
             let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
 
             // Call main method
@@ -109,7 +114,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 return;
             }
 
-            // This hangs and waits for all java threads to close before shutting down
+            // This hangs and waits for all Java threads to close before shutting down
             // Also keeps the JVM open, without this we immediately shut down
             if let Ok(j) = env.get_java_vm() { // This gets around ownership issues
                 close_jvm(j);
@@ -122,8 +127,10 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             }
         }
 
+        // Ensure the JVM is closed
         close_jvm(jvm)
     } else {
+        // Error messages
         if had_jvm_path {
             // String formatting? What's that?
             let version = launch_opts.config.min_java.unwrap_or(0);
@@ -143,6 +150,8 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     }
 }
 
+/// Calls DestroyJavaVM of JNI - it blocks until all Java threads are closed <br>
+/// See <https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#unloading-the-vm>
 fn close_jvm(jvm: JavaVM) {
     unsafe {
         let f : Option<unsafe extern "system" fn(*mut *const JNIInvokeInterface_) -> jint> =
@@ -153,6 +162,10 @@ fn close_jvm(jvm: JavaVM) {
     }
 }
 
+/// This checks the path of the Java dynamic library for a `release` file,
+/// reading the first integer of the `.` separator value of `JAVA_VERSION` as the Java version,
+/// returns `Some(found_ver >= req_ver)` or `None` if the `release` could not be found,
+/// or another error occurs.
 fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
     // First we go up 3 levels from jvm.dll path to get runtime info
     let mut java_folder = jvm_path.to_path_buf();
@@ -176,6 +189,8 @@ fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
     return None
 }
 
+/// Convert string args to the proper format and add to the launch args.<br>
+/// Sets the JVM to ignore unrecognized `-X` args and to expect calls to JNI 2
 fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
     let mut jvm_args = InitArgsBuilder::new()
         .version(JNIVersion::V2)// No touchy or things breaky
@@ -188,7 +203,12 @@ fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
     jvm_args.build()
 }
 
-/// Get all valid paths to JVM.dll
+/// Get all valid paths to the Java dynamic library (Windows: `jvm.dll`),
+/// skipping hidden paths.<br>
+/// If [`Config::jvm_path`] is `None`, search the current working directory.
+/// If `Some`, search the given path.<br>
+/// If [`Config::allows_java_location_lookup`] is `true`,
+/// will search [`JVM_LOC_QUERIES`] for a valid path.
 fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     let mut jvm_paths: Vec<PathBuf> = vec![];
 
@@ -222,6 +242,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     Some(jvm_paths)
 }
 
+/// Checks if the path points to an existing file
 fn valid_path(path: Option<PathBuf>) -> Option<PathBuf> {
     match path {
         None => {None}
@@ -231,10 +252,11 @@ fn valid_path(path: Option<PathBuf>) -> Option<PathBuf> {
     }
 }
 
-/// Locates a file in a given path at max depth 4
+/// Locates a file in a given path at max depth 5
+/// Skips hidden files
 fn find_file(root: &str, file: &str) -> Option<PathBuf> {
     let walker = WalkDir::new(root)
-        .max_depth(4)
+        .max_depth(5)
         .into_iter();
     let mut path = Path::new(root).to_path_buf();
 
