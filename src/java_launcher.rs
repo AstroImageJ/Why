@@ -33,22 +33,10 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     }
 
     // Try and find a valid JVM outside of `JAVA_HOME`
-    let mut jvm_path: Option<PathBuf> = None;
-    let mut had_jvm_path = false; // Used for error message output
-    if let Some(paths) = get_jvm_paths(launch_opts) {
-        for p in paths {
-            jvm_path = Some(p);
-            had_jvm_path = true;
-            break;
-        }
-    } else {
-        message("Failed to find a valid Java installation.\n\
-        Please contact the developers or install a valid version of Java");
-        return;
-    }
+    let jvm_paths = get_jvm_paths(launch_opts);
 
     // The launch attempt
-    if let Some(jvm) = try_launch_jvm(jvm_path, launch_opts) {
+    if let Some(jvm) = try_launch_jvm(jvm_paths, launch_opts) {
         // Attach the current thread to call into Java
         // This method returns the guard that will detach the current thread when dropped,
         // also freeing any local references created in it
@@ -95,53 +83,54 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         close_jvm(jvm)
     } else {
         // Error messages
-        if !had_jvm_path {
-            // String formatting? What's that?
-            let version = launch_opts.config.min_java.unwrap_or(0);
-            let mut inst = "any Java.".to_owned();
-            if version > 0 {
-                let mut x = "Java ".to_owned();
-                x.push_str(version.to_string().as_str());
-                x.push_str(" or newer.");
-                inst = x.clone();
-            }
-            message(&("A missing or older Java installation was found.\n\
-                        Please install ".to_owned() + inst.as_str()))
-        } else {
-            message("Java failed to start. Please check the launch options,\n\
-                    an invalid option was likely used and could not be automatically recovered.")
+        // String formatting? What's that?
+        let version = launch_opts.config.min_java.unwrap_or(0);
+        let mut inst = "any Java.".to_owned();
+        if version > 0 {
+            let mut x = "Java ".to_owned();
+            x.push_str(version.to_string().as_str());
+            x.push_str(" or newer.");
+            inst = x.clone();
         }
+        message(&("A missing or older Java installation was found.\n\
+                    Please install ".to_owned() + inst.as_str()))
     }
 }
 
 /// Create the JVM if possible
-fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
-    return if let Some(jvm_path) = jvm_path {
-        // This is needed for the lookup passed to with_libjvm
-        let path_getter = || {
-            Ok(jvm_path.as_path())
-        };
+fn try_launch_jvm(ref jvm_paths: Option<Vec<PathBuf>>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
+    if let Some(jvm_paths) = jvm_paths {
+        for jvm_path in jvm_paths {
+            // This is needed for the lookup passed to with_libjvm
+            let path_getter = || {
+                Ok(jvm_path.as_path())
+            };
 
-        // Create JVM arguments
-        let args = make_jvm_args(launch_opts);
-        if args.is_err() {
-            message("Failed to create JVM arguments.\n\
-            Please contact the developers or undo any changes to the configuration.");
-            return None;
-        }
+            // Create JVM arguments
+            let args = make_jvm_args(launch_opts);
+            if args.is_err() {
+                message("Failed to create JVM arguments.\n\
+                Please contact the developers or undo any changes to the configuration.");
+                return None;
+            }
 
-        // Create a new VM
-        let maybe_jvm = JavaVM::with_libjvm(args.unwrap(), path_getter);
-        match maybe_jvm {
-            Ok(vm) => { Some(vm) }
-            Err(e) => {
-                println!("{:?}", e);
-                None
+            // Create a new VM
+            let maybe_jvm = JavaVM::with_libjvm(args.unwrap(), path_getter);
+            match maybe_jvm {
+                Ok(vm) => { return Some(vm) }
+                Err(e) => {
+                    println!("{:?}", e);
+                    continue
+                }
             }
         }
-    } else {
-        None
-    };
+        if jvm_paths.len() > 0 {
+            message("A valid Java installation was found, failed to start.\n\
+                Please check the launch arguments as they may be invalid.\n\
+                Please contact the developers.")
+        }
+    }
+    None
 }
 
 /// Calls `DestroyJavaVM` of JNI - it blocks until all Java threads are closed <br>
@@ -204,11 +193,10 @@ fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
 /// If `Some`, search the given path.<br>
 /// If [`Config::allows_java_location_lookup`] is `true`,
 /// will search [`JVM_LOC_QUERIES`] for a valid path.<br>
-/// Also checks Java version for compatibility.
+/// Also checks Java version for compatibility, find at most 3 JVMs to attempt.
 fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     let mut jvm_paths: Vec<PathBuf> = vec![];
     let min_java_ver = launch_opts.config.min_java.unwrap_or(0) as i32;
-    let mut done: bool = false;
 
     match &launch_opts.config.jvm_path {
         // Search current directory
@@ -218,7 +206,6 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
                 if let Some(valid_path) = p {
                     if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                         if compatible {
-                            done = true;
                             jvm_paths.push(valid_path);
                         }
                     }
@@ -231,7 +218,6 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
             if let Some(valid_path) = p {
                 if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                     if compatible {
-                        done = true;
                         jvm_paths.push(valid_path);
                     }
                 }
@@ -240,12 +226,11 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     }
 
     // Check system Java install
-    if launch_opts.config.allows_system_java && !done {
+    if launch_opts.config.allows_system_java && !jvm_paths.len() > 3 {
         if let Ok(path) = java_locator::locate_jvm_dyn_library() {
             let pb = PathBuf::from(path);
             if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
                 if compatible {
-                    done = true;
                     jvm_paths.push(pb);
                 }
             }
@@ -253,18 +238,17 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     }
 
     // Search fallback locations
-    if launch_opts.config.allows_java_location_lookup && !done {
+    if launch_opts.config.allows_java_location_lookup && !jvm_paths.len() > 3 {
         for loc in JVM_LOC_QUERIES.iter() {
             let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
             if let Some(valid_path) = p {
                 if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                     if compatible {
-                        done = true;
                         jvm_paths.push(valid_path);
                     }
                 }
             }
-            if done { break }
+            if jvm_paths.len() > 3 { break }
         }
     }
 
