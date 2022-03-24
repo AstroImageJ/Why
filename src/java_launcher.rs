@@ -101,10 +101,10 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 return;
             }
 
-            // Todo this is a hack to avoid closing the program
-            loop {
-                std::hint::spin_loop();
-                std::thread::sleep(std::time::Duration::MAX);
+            // This hangs and waits for all java threads to close before shutting down
+            // Also keeps the JVM open, without this we immediately shut down
+            if let Ok(j) = env.get_java_vm() { // This gets around ownership issues
+                close_jvm(j);
             }
         } else {
             if let Err(e) = maybe_env {
