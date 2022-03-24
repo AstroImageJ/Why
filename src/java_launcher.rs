@@ -36,19 +36,10 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     let mut jvm_path: Option<PathBuf> = None;
     let mut had_jvm_path = false; // Used for error message output
     if let Some(paths) = get_jvm_paths(launch_opts) {
-        // Try and validate Java version -
-        // if no valid version is found, and a version check failed, try using that one
         for p in paths {
-            if let Some(is_compat) = compatible_java_version(&p, launch_opts.config.min_java.unwrap_or(0) as i32) {
-                if is_compat {
-                    println!("Found valid java!");
-                    jvm_path = Some(p);
-                    break
-                }
-            } else {
-                jvm_path = Some(p);
-            }
+            jvm_path = Some(p);
             had_jvm_path = true;
+            break;
         }
     } else {
         message("Failed to find a valid Java installation.\n\
@@ -234,9 +225,12 @@ fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
 /// If [`Config::jvm_path`] is `None`, search the current working directory.
 /// If `Some`, search the given path.<br>
 /// If [`Config::allows_java_location_lookup`] is `true`,
-/// will search [`JVM_LOC_QUERIES`] for a valid path.
+/// will search [`JVM_LOC_QUERIES`] for a valid path.<br>
+/// Also checks Java version for compatibility.
 fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     let mut jvm_paths: Vec<PathBuf> = vec![];
+    let min_java_ver = launch_opts.config.min_java.unwrap_or(0) as i32;
+    let mut done: bool = false;
 
     match &launch_opts.config.jvm_path {
         // Search current directory
@@ -244,7 +238,12 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
             if let Ok(c_dir) = std::env::current_dir() {
                 let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
                 if let Some(valid_path) = p {
-                    jvm_paths.push(valid_path)
+                    if let Some(b) = compatible_java_version(&valid_path, min_java_ver) {
+                        if b {
+                            done = true;
+                            jvm_paths.push(valid_path);
+                        }
+                    }
                 }
             }
         }
@@ -252,18 +251,29 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         Some(path_str) => {
             let p = valid_path(find_file(path_str, DYN_JAVA_LIB));
             if let Some(valid_path) = p {
-                jvm_paths.push(valid_path)
+                if let Some(b) = compatible_java_version(&valid_path, min_java_ver) {
+                    if b {
+                        done = true;
+                        jvm_paths.push(valid_path);
+                    }
+                }
             }
         }
     }
 
     // Search fallback locations
-    if launch_opts.config.allows_java_location_lookup {
+    if launch_opts.config.allows_java_location_lookup && !done {
         for loc in JVM_LOC_QUERIES.iter() {
             let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
             if let Some(valid_path) = p {
-                jvm_paths.push(valid_path)
+                if let Some(b) = compatible_java_version(&valid_path, min_java_ver) {
+                    if b {
+                        done = true;
+                        jvm_paths.push(valid_path);
+                    }
+                }
             }
+            if done { break }
         }
     }
 
