@@ -10,7 +10,7 @@ use crate::launch_config::LauncherConfig;
 use crate::message;
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
-const JVM_LOC_QUERIES: Vec<String> = vec![];//todo fill
+const JVM_LOC_QUERIES: &'static [&str] = &["$USER$/.gradle/jdks"];//todo expand
 
 /// Name of the dynamic Java library file.
 const DYN_JAVA_LIB: &str = "jvm.dll";
@@ -249,7 +249,6 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         }
         // Search specified directory
         Some(path_str) => {
-            //todo not just windows, but not me
             let p = valid_path(find_file(path_str, DYN_JAVA_LIB));
             if let Some(valid_path) = p {
                 jvm_paths.push(valid_path)
@@ -260,7 +259,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     // Search fallback locations
     if launch_opts.config.allows_java_location_lookup {
         for loc in JVM_LOC_QUERIES.iter() {
-            let p = valid_path(find_file(loc, DYN_JAVA_LIB));
+            let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
             if let Some(valid_path) = p {
                 jvm_paths.push(valid_path)
             }
@@ -268,6 +267,13 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     }
 
     Some(jvm_paths)
+}
+
+/// Replace tokens with their real values
+fn process_path(path: &str) -> String {
+    let user_path = dirs::home_dir().unwrap_or_default();
+    let user = user_path.to_str().unwrap_or("");
+    path.replace("$USER$", user)
 }
 
 /// Checks if the path points to an existing file
@@ -301,7 +307,7 @@ fn find_file(root: &str, file: &str) -> Option<PathBuf> {
                     if name == file {
                         path = e.into_path();
                         has_path = true;
-                        break;
+                        // Don't break here in case of multiple installs in one folder
                     }
                 }
             }
