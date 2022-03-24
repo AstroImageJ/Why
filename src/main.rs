@@ -13,6 +13,9 @@ mod launch_config;
 /// Entrypoint
 fn main() {
     println!("Launcher starting!");
+
+    correct_directory();
+
     // todo comment when publishing
     //std::env::set_current_dir("./test");
 
@@ -39,4 +42,18 @@ fn launch() {
 
     // Run the app
     create_and_run_jvm(&m)
+}
+
+/// This makes sure the current working directory is the exe's home.<br>
+/// This can differ from the current working directory in cases where you are running the exe
+/// from command line or script from a different location.
+fn correct_directory() {
+    // This gets the location of the exe file, not its current working directory
+    // These can differ if say running the exe through command line when in a different folder
+    let exe_home = std::env::current_exe();
+    if let Ok(exe_home) = exe_home {
+        if let Some(exe_home) = exe_home.parent() {
+            let _ = std::env::set_current_dir(exe_home);
+        }
+    }
 }
