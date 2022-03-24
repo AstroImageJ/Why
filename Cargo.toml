@@ -1,5 +1,5 @@
 [package]
-name = "java_launcher"
+name = "JavaLauncher"
 version = "0.2.1"
 authors = ["Kevin Eastridge"]
 edition = "2021"
