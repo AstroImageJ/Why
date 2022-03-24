@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
+
 use config::{Config, FileFormat};
 use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError};
 use jni::objects::JValue;
 use jni::sys::{jint, JNIInvokeInterface_};
 use walkdir::{DirEntry, WalkDir};
+
 use crate::launch_config::LauncherConfig;
 use crate::message;
 
@@ -77,7 +79,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
 
                 // Launch failed
                 if let Err(e) = v {
-                    println!("{}", e);
+                    println!("{:?}", e);
                     message("Failed to start the app, the classname was invalid or \
                     not on the classpath, or the main method could not be found.\n\
                     Please contact the developers.");
@@ -91,7 +93,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 }
             }
             Err(e) => {
-                println!("{}", e);
+                println!("{:?}", e);
                 message("Java successfully started, but failed to attach to it and therefore cannot proceed.\n\
                 Please contact the developers.")
             }
@@ -141,7 +143,7 @@ fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option
         match maybe_jvm {
             Ok(vm) => { Some(vm) }
             Err(e) => {
-                println!("{}", e);
+                println!("{:?}", e);
                 // Fallback to system Java, Java version is not verified
                 try_load_system_java(launch_opts)
             }
@@ -149,7 +151,7 @@ fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option
     } else {
         // Fallback to system Java, Java version is not verified
         try_load_system_java(launch_opts)
-    }
+    };
 }
 
 /// Tries to create JVM from system Java, checking if the launch options allow it
@@ -169,14 +171,14 @@ fn try_load_system_java(launch_opts: &LaunchOpts) -> Option<JavaVM> {
                         Please contact the developers.");
             None
         }
-    }
+    };
 }
 
 /// Calls `DestroyJavaVM` of JNI - it blocks until all Java threads are closed <br>
 /// See <https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#unloading-the-vm>
 fn close_jvm(jvm: JavaVM) {
     unsafe {
-        let f : Option<unsafe extern "system" fn(*mut *const JNIInvokeInterface_) -> jint> =
+        let f: Option<unsafe extern "system" fn(*mut *const JNIInvokeInterface_) -> jint> =
             (*(*jvm.get_java_vm_pointer())).DestroyJavaVM;
         if let Some(func) = f {
             func(jvm.get_java_vm_pointer());
@@ -209,7 +211,7 @@ fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
         return Some(ver >= req_ver);
     }
 
-    return None
+    return None;
 }
 
 /// Convert string args to the proper format and add to the launch args.<br>
@@ -271,9 +273,9 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
 /// Checks if the path points to an existing file
 fn valid_path(path: Option<PathBuf>) -> Option<PathBuf> {
     match path {
-        None => {None}
+        None => { None }
         Some(p) => {
-            if p.exists() {Some(p)} else { None }
+            if p.exists() { Some(p) } else { None }
         }
     }
 }
@@ -299,13 +301,13 @@ fn find_file(root: &str, file: &str) -> Option<PathBuf> {
                     if name == file {
                         path = e.into_path();
                         has_path = true;
-                        break
+                        break;
                     }
                 }
             }
         }
     }
-    if has_path {Some(path)} else {None}
+    if has_path { Some(path) } else { None }
 }
 
 /// Used to skip hidden files

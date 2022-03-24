@@ -1,7 +1,8 @@
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
-use std::path::{Path};
+use std::path::Path;
+
 use config::{Config, FileFormat};
 
 /// These module paths must be in the form of opt=value
@@ -42,7 +43,7 @@ pub struct LauncherConfig {
     /// key: allow_java_location_lookup; format: boolean;
     /// what it does: whether the launcher should check common Java
     /// installation directories for a Java install
-    pub allows_java_location_lookup: bool
+    pub allows_java_location_lookup: bool,
 }
 
 /// Sets the defaults
@@ -55,16 +56,12 @@ impl Default for LauncherConfig {
             min_java: None,
             launch_options_file: None,
             allows_system_java: true,
-            allows_java_location_lookup: true
+            allows_java_location_lookup: true,
         }
     }
 }
 
 impl LauncherConfig {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
     /// Ensure that enough information is provided to actually start Java
     pub fn validate(&self) -> bool {
         self.main_class.is_some() && self.classpath.is_some()
@@ -88,7 +85,7 @@ impl LauncherConfig {
             }
         } else {
             Default::default()
-        }
+        };
     }
 
     /// Read `launch_options_file` into a series of launch options,
@@ -109,7 +106,7 @@ impl LauncherConfig {
             }
         }
 
-        return out
+        return out;
     }
 }
 
@@ -117,9 +114,9 @@ impl LauncherConfig {
 pub fn parse_line(line: String) -> Vec<String> {
     let out: Vec<String> = vec![];
     if !line.starts_with("#") {
-        let m= line.split(" ");
+        let m = line.split(" ");
         let a: Vec<String> = m.map(String::from).collect();
-        return a
+        return a;
     }
 
     out

@@ -1,4 +1,6 @@
-#[cfg(windows)] extern crate winapi;
+#[cfg(windows)]
+extern crate winapi;
+
 use std::io::Error;
 
 #[cfg(windows)]
@@ -7,7 +9,7 @@ fn print_message(msg: &str) -> Result<i32, Error> {
     use std::iter::once;
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;
-    use winapi::um::winuser::{MB_OK, MessageBoxW};
+    use winapi::um::winuser::{MessageBoxW, MB_OK};
     let wide: Vec<u16> = OsStr::new(msg).encode_wide().chain(once(0)).collect();
     let title: Vec<u16> = OsStr::new("Launcher").encode_wide().chain(once(0)).collect();
     let ret = unsafe {
@@ -15,8 +17,11 @@ fn print_message(msg: &str) -> Result<i32, Error> {
         MessageBeep(SPI_GETBEEP);
         MessageBoxW(null_mut(), wide.as_ptr(), title.as_ptr(), MB_OK)
     };
-    if ret == 0 { Err(Error::last_os_error()) }
-    else { Ok(ret) }
+    if ret == 0 {
+        Err(Error::last_os_error())
+    } else {
+        Ok(ret)
+    }
 }
 
 #[cfg(not(windows))]
