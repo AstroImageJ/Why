@@ -234,6 +234,19 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         }
     }
 
+    // Check system Java install
+    if launch_opts.config.allows_system_java && !done {
+        if let Ok(path) = java_locator::locate_jvm_dyn_library() {
+            let pb = PathBuf::from(path);
+            if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
+                if compatible {
+                    done = true;
+                    jvm_paths.push(pb);
+                }
+            }
+        }
+    }
+
     // Search fallback locations
     if launch_opts.config.allows_java_location_lookup && !done {
         for loc in JVM_LOC_QUERIES.iter() {
@@ -247,18 +260,6 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
                 }
             }
             if done { break }
-        }
-    }
-
-    // Check system Java install
-    if launch_opts.config.allows_system_java && !done {
-        if let Ok(path) = java_locator::locate_jvm_dyn_library() {
-            let pb = PathBuf::from(path);
-            if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
-                if compatible {
-                    jvm_paths.push(pb);
-                }
-            }
         }
     }
 
