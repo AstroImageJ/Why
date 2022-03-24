@@ -45,6 +45,7 @@ pub struct LauncherConfig {
     pub allows_java_location_lookup: bool
 }
 
+/// Sets the defaults
 impl Default for LauncherConfig {
     fn default() -> Self {
         LauncherConfig {
@@ -64,10 +65,12 @@ impl LauncherConfig {
         Default::default()
     }
 
+    /// Ensure that enough information is provided to actually start Java
     pub fn validate(&self) -> bool {
         self.main_class.is_some() && self.classpath.is_some()
     }
 
+    /// Read `launcher.ini` and setup the launcher config.
     pub fn read_file() -> Self {
         let config_file = Config::builder()
             .add_source(config::File::new("launcher.ini", FileFormat::Ini))
@@ -88,6 +91,8 @@ impl LauncherConfig {
         }
     }
 
+    /// Read `launch_options_file` into a series of launch options,
+    /// sanitizing and correcting where possible.
     pub fn read_launch_opts(&self) -> Vec<String> {
         let mut out: Vec<String> = vec![];
         if self.launch_options_file.as_ref().is_some() {
@@ -108,7 +113,7 @@ impl LauncherConfig {
     }
 }
 
-//todo sanitize for things like : in -Xmx1000 as it will cause crashes on startup
+/// Convert a line into several strings, splitting on spaces.
 pub fn parse_line(line: String) -> Vec<String> {
     let out: Vec<String> = vec![];
     if !line.starts_with("#") {
@@ -120,6 +125,8 @@ pub fn parse_line(line: String) -> Vec<String> {
     out
 }
 
+/// Verify Java standard options (those beginning with `-X`).<br>
+/// If wrongly formatted, the JVM will fail on startup.
 fn verify_opt(input: String) -> String {
     for opt in STANDARD_OPTS {
         if input.starts_with(opt) {
@@ -147,6 +154,7 @@ fn verify_line(mut line: String) -> String {
     line
 }
 
+/// Read file as lines
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     where P: AsRef<Path>, {
     let file = File::open(filename)?;

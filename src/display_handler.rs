@@ -1,6 +1,5 @@
 #[cfg(windows)] extern crate winapi;
 use std::io::Error;
-use winapi::um::winuser::SPI_GETBEEP;
 
 #[cfg(windows)]
 fn print_message(msg: &str) -> Result<i32, Error> {
@@ -12,6 +11,8 @@ fn print_message(msg: &str) -> Result<i32, Error> {
     let wide: Vec<u16> = OsStr::new(msg).encode_wide().chain(once(0)).collect();
     let title: Vec<u16> = OsStr::new("Launcher").encode_wide().chain(once(0)).collect();
     let ret = unsafe {
+        use winapi::um::winuser::{MessageBeep, SPI_GETBEEP};
+        MessageBeep(SPI_GETBEEP);
         MessageBoxW(null_mut(), wide.as_ptr(), title.as_ptr(), MB_OK)
     };
     if ret == 0 { Err(Error::last_os_error()) }
@@ -23,12 +24,10 @@ fn print_message(msg: &str) -> Result<(), Error> {
     println!("{}", msg);
     Ok(())
 }
-//todo this or windows crate
+
+/// Display a native message dialog.<br>
+/// Eats any errors that occur.
 pub fn message(msg: &str) {
-    unsafe {
-        use winapi::um::winuser::{MessageBeep};
-        MessageBeep(SPI_GETBEEP);
-    }
     if let Ok(_) = print_message(msg) {
         // no-op
     }

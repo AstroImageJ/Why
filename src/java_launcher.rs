@@ -7,8 +7,13 @@ use walkdir::{DirEntry, WalkDir};
 use crate::launch_config::LauncherConfig;
 use crate::message;
 
+/// The fallback locations to look for a Java installation, drawn from common install locations.
 const JVM_LOC_QUERIES: Vec<String> = vec![];//todo fill
 
+/// Name of the dynamic Java library file.
+const DYN_JAVA_LIB: &str = "jvm.dll";
+
+/// The launcher options, such as JVM args and where the JVM is located.
 pub struct LaunchOpts {
     pub config: LauncherConfig,
     pub jvm_opts: Vec<String>,
@@ -70,6 +75,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 // Call main method
                 let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &opts[..]);
 
+                // Launch failed
                 if let Err(e) = v {
                     println!("{}", e);
                     message("Failed to start the app, the classname was invalid or \
@@ -116,7 +122,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
 
 /// Create the JVM if possible
 fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
-    if let Some(jvm_path) = jvm_path {
+    return if let Some(jvm_path) = jvm_path {
         // This is needed for the lookup passed to with_libjvm
         let path_getter = || {
             Ok(jvm_path.as_path())
@@ -132,17 +138,17 @@ fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option
 
         // Create a new VM
         let maybe_jvm = JavaVM::with_libjvm(args.unwrap(), path_getter);
-        return match maybe_jvm {
+        match maybe_jvm {
             Ok(vm) => { Some(vm) }
             Err(e) => {
                 println!("{}", e);
                 // Fallback to system Java, Java version is not verified
                 try_load_system_java(launch_opts)
             }
-        };
+        }
     } else {
         // Fallback to system Java, Java version is not verified
-        return try_load_system_java(launch_opts)
+        try_load_system_java(launch_opts)
     }
 }
 
@@ -166,7 +172,7 @@ fn try_load_system_java(launch_opts: &LaunchOpts) -> Option<JavaVM> {
     }
 }
 
-/// Calls DestroyJavaVM of JNI - it blocks until all Java threads are closed <br>
+/// Calls `DestroyJavaVM` of JNI - it blocks until all Java threads are closed <br>
 /// See <https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#unloading-the-vm>
 fn close_jvm(jvm: JavaVM) {
     unsafe {
@@ -179,7 +185,7 @@ fn close_jvm(jvm: JavaVM) {
 }
 
 /// This checks the path of the Java dynamic library for a `release` file,
-/// reading the first integer of the `.` separator value of `JAVA_VERSION` as the Java version,
+/// reading the first integer of the `.` separated value of `JAVA_VERSION` as the Java version,
 /// returns `Some(found_ver >= req_ver)` or `None` if the `release` could not be found,
 /// or another error occurs.
 fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
@@ -191,6 +197,7 @@ fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
         }
     }
 
+    // Try and get the Java version of the installation
     if let Some(release_path) = valid_path(find_file(java_folder.to_str()?, "release")) {
         let release_info = Config::builder()
             .add_source(config::File::from(release_path).format(FileFormat::Ini))
@@ -219,7 +226,7 @@ fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
     jvm_args.build()
 }
 
-/// Get all valid paths to the Java dynamic library (Windows: `jvm.dll`),
+/// Get all valid paths to [`DYN_JAVA_LIB`],
 /// skipping hidden paths.<br>
 /// If [`Config::jvm_path`] is `None`, search the current working directory.
 /// If `Some`, search the given path.<br>
@@ -232,7 +239,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         // Search current directory
         None => {
             if let Ok(c_dir) = std::env::current_dir() {
-                let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), "jvm.dll"));
+                let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
                 if let Some(valid_path) = p {
                     jvm_paths.push(valid_path)
                 }
@@ -241,7 +248,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         // Search specified directory
         Some(path_str) => {
             //todo not just windows, but not me
-            let p = valid_path(find_file(path_str, "jvm.dll"));
+            let p = valid_path(find_file(path_str, DYN_JAVA_LIB));
             if let Some(valid_path) = p {
                 jvm_paths.push(valid_path)
             }
@@ -251,7 +258,7 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     // Search fallback locations
     if launch_opts.config.allows_java_location_lookup {
         for loc in JVM_LOC_QUERIES.iter() {
-            let p = valid_path(find_file(loc, "jvm.dll"));
+            let p = valid_path(find_file(loc, DYN_JAVA_LIB));
             if let Some(valid_path) = p {
                 jvm_paths.push(valid_path)
             }
@@ -292,12 +299,13 @@ fn find_file(root: &str, file: &str) -> Option<PathBuf> {
                     if name == file {
                         path = e.into_path();
                         has_path = true;
+                        break
                     }
                 }
             }
         }
     }
-    if has_path {Some(path)} else { None }
+    if has_path {Some(path)} else {None}
 }
 
 /// Used to skip hidden files
