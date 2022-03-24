@@ -143,12 +143,6 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     }
 }
 
-fn convert_opts<T, const N: usize>(v: Vec<T>) -> [T; N] {
-    use std::convert::TryInto;
-    v.try_into()
-        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
-}
-
 fn close_jvm(jvm: JavaVM) {
     unsafe {
         let f : Option<unsafe extern "system" fn(*mut *const JNIInvokeInterface_) -> jint> =
