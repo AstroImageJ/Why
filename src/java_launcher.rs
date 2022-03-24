@@ -95,22 +95,17 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         close_jvm(jvm)
     } else {
         // Error messages
-        if had_jvm_path {
-            // String formatting? What's that?
-            let version = launch_opts.config.min_java.unwrap_or(0);
-            let mut inst = "any Java.".to_owned();
-            if version > 0 {
-                let mut x = "Java ".to_owned();
-                x.push_str(version.to_string().as_str());
-                x.push_str(" or newer.");
-                inst = x.clone();
-            }
-            message(&("A valid Java installation was found but it was too old.\n\
-            Please install ".to_owned() + inst.as_str()))
-        } else {
-            message("Failed to find a valid Java installation and giving up.\n\
-            Please contact the developers or install a valid version of Java.")
+        // String formatting? What's that?
+        let version = launch_opts.config.min_java.unwrap_or(0);
+        let mut inst = "any Java.".to_owned();
+        if version > 0 {
+            let mut x = "Java ".to_owned();
+            x.push_str(version.to_string().as_str());
+            x.push_str(" or newer.");
+            inst = x.clone();
         }
+        message(&("A missing or older Java installation was found.\n\
+                        Please install ".to_owned() + inst.as_str()))
     }
 }
 
@@ -136,33 +131,11 @@ fn try_launch_jvm(jvm_path: Option<PathBuf>, launch_opts: &LaunchOpts) -> Option
             Ok(vm) => { Some(vm) }
             Err(e) => {
                 println!("{:?}", e);
-                // Fallback to system Java, Java version is not verified
-                try_load_system_java(launch_opts)
+                None
             }
         }
     } else {
-        // Fallback to system Java, Java version is not verified
-        try_load_system_java(launch_opts)
-    };
-}
-
-/// Tries to create JVM from system Java, checking if the launch options allow it
-fn try_load_system_java(launch_opts: &LaunchOpts) -> Option<JavaVM> {
-    if !launch_opts.config.allows_system_java {
-        message("Failed to load Java from the searched paths.\n\
-                    Please contact the developers.");
-        return None;
-    }
-
-    let maybe_jvm = JavaVM::new(make_jvm_args(launch_opts).unwrap());
-    return match maybe_jvm {
-        Ok(vm) => { Some(vm) }
-        Err(_) => {
-            message("Failed to load Java from the searched paths and failed again \
-                        when trying the installation at JAVA_HOME.\n\
-                        Please contact the developers.");
-            None
-        }
+        None
     };
 }
 
@@ -238,8 +211,8 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
             if let Ok(c_dir) = std::env::current_dir() {
                 let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
                 if let Some(valid_path) = p {
-                    if let Some(b) = compatible_java_version(&valid_path, min_java_ver) {
-                        if b {
+                    if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                        if compatible {
                             done = true;
                             jvm_paths.push(valid_path);
                         }
@@ -251,8 +224,8 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         Some(path_str) => {
             let p = valid_path(find_file(path_str, DYN_JAVA_LIB));
             if let Some(valid_path) = p {
-                if let Some(b) = compatible_java_version(&valid_path, min_java_ver) {
-                    if b {
+                if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                    if compatible {
                         done = true;
                         jvm_paths.push(valid_path);
                     }
@@ -266,14 +239,26 @@ fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
         for loc in JVM_LOC_QUERIES.iter() {
             let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
             if let Some(valid_path) = p {
-                if let Some(b) = compatible_java_version(&valid_path, min_java_ver) {
-                    if b {
+                if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                    if compatible {
                         done = true;
                         jvm_paths.push(valid_path);
                     }
                 }
             }
             if done { break }
+        }
+    }
+
+    // Check system Java install
+    if launch_opts.config.allows_system_java && !done {
+        if let Ok(path) = java_locator::locate_jvm_dyn_library() {
+            let pb = PathBuf::from(path);
+            if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
+                if compatible {
+                    jvm_paths.push(pb);
+                }
+            }
         }
     }
 

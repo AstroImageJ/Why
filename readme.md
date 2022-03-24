@@ -7,8 +7,6 @@ Features:
   - If not specified, will try the current working directory (depth of 4)
   - Has configurable fallback to `JAVA_HOME` and (TODO)common Java installation paths
 - Java version validation
-  - If no version is found and validation had a failure, attempt with the no-version installation
-  - Does not run for Java in the Path as that is considered a fallback mode
 - Configuration done through `launcher.ini`
 
 Drawbacks:
