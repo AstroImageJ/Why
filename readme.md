@@ -3,7 +3,7 @@
 A launcher in Rust to launch Java applications for Windows.
 
 ### Features:
-- [Configurable JVM lookup](jvm selection.md)
+- [Configurable JVM lookup](<jvm selection.md>)
   - If not specified, will try the current working directory (depth of 5)
   - Has configurable fallback to `JAVA_HOME` and common Java installation paths
 - Java version validation
