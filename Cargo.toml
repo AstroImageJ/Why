@@ -17,6 +17,7 @@ winapi = { version = "0.3.9", features = ["winuser"] }
 dirs = "4.0.0"
 java-locator = "0.1.2"
 sysinfo = "0.23.5"
+zip = { version = "0.6"}
 
 # From https://github.com/johnthagen/min-sized-rust
 [profile.release]

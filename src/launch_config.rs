@@ -5,6 +5,7 @@ use std::path::Path;
 
 use config::{Config, FileFormat};
 use sysinfo::{System, SystemExt};
+use crate::get_java_version_of_main;
 
 /// These module paths must be in the form of opt=value
 const MODULE_OPTS: &'static [&str] = &["--add-reads", "--add-exports", "--add-opens",
@@ -48,6 +49,11 @@ pub struct LauncherConfig {
     /// key: maximum_heap_percentage; format: integer;
     /// what it does: sets the -Xmx to this value if missing from the launch args.
     pub max_mem_percent: Option<i64>,
+    /// key: check_main_class; format: boolean;
+    /// what it does: whether the launcher should check check the main class' Java version
+    /// requirement and use that as the min_java if the current min_java is not specified or
+    /// less than the found main class requirement. Otherwise, use the specified min_java.
+    pub check_main_class: bool,
 }
 
 /// Sets the defaults
@@ -62,6 +68,7 @@ impl Default for LauncherConfig {
             launch_options_file: None,
             allows_system_java: true,
             allows_java_location_lookup: true,
+            check_main_class: true,
         }
     }
 }
@@ -72,13 +79,15 @@ impl LauncherConfig {
         self.main_class.is_some() && self.classpath.is_some()
     }
 
-    /// Read `launcher.ini` and setup the launcher config.
+    /// Read `launcher.ini` and setup the launcher config.<br>
+    /// This will also ensure that the main class can be run by the minimum Java requirement,
+    /// if enabled.
     pub fn read_file() -> Self {
         let config_file = Config::builder()
             .add_source(config::File::new("launcher.ini", FileFormat::Ini))
             .build();
         return if let Ok(c) = config_file {
-            LauncherConfig {
+            let mut cfg = LauncherConfig {
                 main_class: c.get_string("mainclass").ok(),
                 classpath: c.get_string("classpath").ok(),
                 jvm_path: c.get_string("jvm_install").ok(),
@@ -87,8 +96,11 @@ impl LauncherConfig {
                 allows_system_java: c.get_bool("allow_system_java").unwrap_or(true),
                 allows_java_location_lookup: c.get_bool("allow_java_location_lookup").unwrap_or(true),
                 max_mem_percent: c.get_int("maximum_heap_percentage").ok(),
+                check_main_class: c.get_bool("check_main_class").unwrap_or(true),
                 ..Default::default()
-            }
+            };
+            cfg.ensure_correct_java();
+            cfg
         } else {
             Default::default()
         };
@@ -120,6 +132,20 @@ impl LauncherConfig {
         }
 
         return out;
+    }
+
+    /// Make sure the minimum Java requirement is not less than that needed for the main class.
+    pub fn ensure_correct_java(&mut self) {
+        let new_min = get_java_version_of_main(self);
+        if let Some(new_min) = new_min {
+            if let Some(min_java) = self.min_java {
+                if new_min as i64 > min_java {
+                    self.min_java = Some(new_min as i64);
+                }
+            } else {
+                self.min_java = Some(new_min as i64);
+            }
+        }
     }
 }
 
