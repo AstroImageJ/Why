@@ -9,7 +9,20 @@ use zip::ZipArchive;
 use crate::{LauncherConfig, LaunchOpts};
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
-const JVM_LOC_QUERIES: &'static [&str] = &["$USER$/.gradle/jdks"];//todo expand
+const JVM_LOC_QUERIES: &'static [&str] = &[
+    "$USER$/.gradle/jdks",
+    "C:/Program Files/Java",
+    "C:/Program Files (x86)/Java",
+    "C:/Program Files/AdoptOpenJDK",
+    "C:/Program Files/JavaSoft/Java Runtime Environment",
+    "C:/Program Files/JavaSoft/Java Development Kit",
+    "C:/Program Files/JavaSoft/JRE",
+    "C:/Program Files/JavaSoft/JDK",
+    "C:/Program Files/Eclipse Foundation/JDK",
+    "C:/Program Files/Eclipse Adoptium/JDK",
+    "C:/Program Files/Eclipse Adoptium/JRE",
+    "C:/Program Files/Azul Systems/Zulu",
+];
 
 /// Name of the dynamic Java library file.
 const DYN_JAVA_LIB: &str = "jvm.dll";
