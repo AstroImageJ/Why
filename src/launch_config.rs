@@ -204,7 +204,7 @@ fn get_max_heap(mem_per: i64) -> u64 {
     let mut sys = System::new_all();
     sys.refresh_all();
     let max_mem = sys.total_memory();
-    let mut mem_frac: f64 = ((mem_per as f64) / 100f64);
+    let mut mem_frac: f64 = (mem_per as f64) / 100f64;
     if mem_frac <= 0.01f64 || mem_frac >= 1f64 {
         mem_frac = 0.2f64;
     }
