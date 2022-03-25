@@ -136,14 +136,16 @@ impl LauncherConfig {
 
     /// Make sure the minimum Java requirement is not less than that needed for the main class.
     pub fn ensure_correct_java(&mut self) {
-        let new_min = get_java_version_of_main(self);
-        if let Some(new_min) = new_min {
-            if let Some(min_java) = self.min_java {
-                if new_min as i64 > min_java {
+        if self.check_main_class {
+            let new_min = get_java_version_of_main(self);
+            if let Some(new_min) = new_min {
+                if let Some(min_java) = self.min_java {
+                    if new_min as i64 > min_java {
+                        self.min_java = Some(new_min as i64);
+                    }
+                } else {
                     self.min_java = Some(new_min as i64);
                 }
-            } else {
-                self.min_java = Some(new_min as i64);
             }
         }
     }
