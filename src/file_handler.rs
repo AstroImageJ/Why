@@ -12,7 +12,6 @@ use crate::{LauncherConfig, LaunchOpts};
 const JVM_LOC_QUERIES: &'static [&str] = &[
     "$USER$/.gradle/jdks",
     "C:/Program Files/Java",
-    "C:/Program Files (x86)/Java",
     "C:/Program Files/AdoptOpenJDK",
     "C:/Program Files/JavaSoft/Java Runtime Environment",
     "C:/Program Files/JavaSoft/Java Development Kit",
