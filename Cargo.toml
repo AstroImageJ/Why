@@ -9,7 +9,7 @@ license = "LGPL-3.0"
 
 [dependencies]
 # See https://github.com/jni-rs/jni-rs/pull/293 linking to path only is silly
-jni = { git = "https://github.com/keastrid/jni-rs", branch = "dyn-load-jvm", features = ["invocation", "invocation-dyn"] }
+jni = { git = "https://github.com/AstroImageJ/jni-rs", branch = "dyn-load-jvm", features = ["invocation", "invocation-dyn"] }
 walkdir = "2"
 config = "0.12.0"
 [target.'cfg(windows)'.dependencies]

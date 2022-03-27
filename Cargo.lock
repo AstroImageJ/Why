@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "JavaLauncher"
-version = "0.2.1"
+version = "1.0.0"
 dependencies = [
  "config",
  "dirs",
@@ -443,7 +443,7 @@ dependencies = [
 [[package]]
 name = "jni"
 version = "0.19.0"
-source = "git+https://github.com/keastrid/jni-rs?branch=dyn-load-jvm#fb384919ea8532484a03632b51dd7cef60d8340b"
+source = "git+https://github.com/AstroImageJ/jni-rs?branch=dyn-load-jvm#fb384919ea8532484a03632b51dd7cef60d8340b"
 dependencies = [
  "cesu8",
  "cfg-if",
