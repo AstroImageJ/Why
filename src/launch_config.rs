@@ -127,7 +127,7 @@ impl LauncherConfig {
         if let Some(mem_per) = self.max_mem_percent {
             let has_xmx = out.iter().any(|s| s.starts_with("-Xmx"));
             if !has_xmx {
-                out.push(format!("-Xmx{}kb", get_max_heap(mem_per)))
+                out.push(format!("-Xmx{}k", get_max_heap(mem_per)))
             }
         }
 
