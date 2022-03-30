@@ -40,9 +40,6 @@ fn launch() {
         m.program_opts.remove(0);
     }
 
-    m.program_opts.push("hi".parse().unwrap());
-    m.program_opts.push("hi2".parse().unwrap());
-
     // Build classpath
     m.jvm_opts.append(&mut m.config.read_launch_opts());
     if m.config.classpath.is_some() {
