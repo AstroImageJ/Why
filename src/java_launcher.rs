@@ -1,8 +1,8 @@
 use std::path::{PathBuf};
 
-use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError};
+use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError, sys};
 use jni::objects::{JObject, JValue};
-use jni::sys::{jint, JNIInvokeInterface_};
+use jni::sys::{jint, JNI_GetCreatedJavaVMs, JNI_OK, JNIInvokeInterface_, jsize};
 use crate::file_handler::get_jvm_paths;
 
 use crate::launch_config::LauncherConfig;
@@ -30,7 +30,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     let jvm_paths = get_jvm_paths(launch_opts);
 
     // The launch attempt
-    if let Some(jvm) = try_launch_jvm(jvm_paths, launch_opts) {
+    if let Some(jvm) = try_launch_jvm(&jvm_paths, launch_opts) {
         // Attach the current thread to call into Java
         // This method returns the guard that will detach the current thread when dropped,
         // also freeing any local references created in it
@@ -101,7 +101,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
 }
 
 /// Create the JVM if possible
-fn try_launch_jvm(ref jvm_paths: Option<Vec<PathBuf>>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
+fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
     if let Some(jvm_paths) = jvm_paths {
         for jvm_path in jvm_paths {
             // This is needed for the lookup passed to with_libjvm
@@ -115,6 +115,12 @@ fn try_launch_jvm(ref jvm_paths: Option<Vec<PathBuf>>, launch_opts: &LaunchOpts)
                 message("Failed to create JVM arguments.\n\
                 Please contact the developers or undo any changes to the configuration.");
                 return None;
+            }
+
+            if launch_opts.config.use_previous_jvm {
+                if let Some(old_jvm) = get_prev_jvm_made(jvm_path) {
+                    return Some(old_jvm)
+                }
             }
 
             // Create a new VM
@@ -145,6 +151,27 @@ fn close_jvm(jvm: JavaVM) {
         if let Some(func) = f {
             func(jvm.get_java_vm_pointer());
         }
+    }
+}
+
+/// Attempt to get the previously created JVM.<br>
+/// See <https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_getcreatedjavavms>
+fn get_prev_jvm_made(jvm_path: &PathBuf) -> Option<JavaVM> {
+    let mut jvm_count: i32 = 88;
+    let jvm_count_ptr: *mut i32 = &mut jvm_count;
+    let mut jvm_buf: *mut sys::JavaVM = std::ptr::null_mut();
+    let jvm_buf_ptr: *mut *mut sys::JavaVM = &mut jvm_buf;
+    unsafe {
+        let lib = libloading::Library::new(jvm_path).ok()?;
+        let f: libloading::
+        Symbol<unsafe extern fn(vm_buf: *mut *mut sys::JavaVM, buf_len: jsize, n_vms: *mut jsize) -> jint> =
+            lib.get(b"JNI_GetCreatedJavaVMs").ok()?;
+        let r = f(jvm_buf_ptr, 1, jvm_count_ptr);
+        if r == JNI_OK && jvm_count > 0 {
+            let jvm = JavaVM::from_raw(*jvm_buf_ptr).ok()?;
+            return Some(jvm);
+        }
+        None
     }
 }
 

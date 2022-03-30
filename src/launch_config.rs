@@ -55,6 +55,12 @@ pub struct LauncherConfig {
     /// requirement and use that as the min_java if the current min_java is not specified or
     /// less than the found main class requirement. Otherwise, use the specified min_java.
     pub check_main_class: bool,
+    /// key: use_previous_jvm; format: boolean;
+    /// what it does: whether the launcher should check if the selected JVM has a previous
+    /// instance opened, and if so, use that instance instead of making a new one.<br>
+    /// On Linux and Windows, it is typical to open a new instance of the application for file
+    /// associations, this allows that behavior to be overruled.
+    pub use_previous_jvm: bool,
 }
 
 /// Sets the defaults
@@ -70,6 +76,7 @@ impl Default for LauncherConfig {
             allows_system_java: true,
             allows_java_location_lookup: true,
             check_main_class: true,
+            use_previous_jvm: false,
         }
     }
 }
@@ -98,6 +105,7 @@ impl LauncherConfig {
                 allows_java_location_lookup: c.get_bool("allow_java_location_lookup").unwrap_or(true),
                 max_mem_percent: c.get_int("maximum_heap_percentage").ok(),
                 check_main_class: c.get_bool("check_main_class").unwrap_or(true),
+                use_previous_jvm: c.get_bool("use_previous_jvm").unwrap_or(false),
                 ..Default::default()
             };
             cfg.ensure_correct_java();
