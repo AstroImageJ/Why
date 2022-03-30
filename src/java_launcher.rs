@@ -1,14 +1,17 @@
+use std::any::Any;
 use std::path::{PathBuf};
 
 use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError};
-use jni::objects::JValue;
-use jni::sys::{jint, JNIInvokeInterface_};
+use jni::descriptors::Desc;
+use jni::objects::{JObject, JString, JValue};
+use jni::sys::{jint, JNIInvokeInterface_, jstring};
 use crate::file_handler::get_jvm_paths;
 
 use crate::launch_config::LauncherConfig;
 use crate::message;
 
 /// The launcher options, such as JVM args and where the JVM is located.
+#[derive(Debug)]
 pub struct LaunchOpts {
     pub config: LauncherConfig,
     pub jvm_opts: Vec<String>,
@@ -44,11 +47,20 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                     .filter(|m| m.is_ok()).map(|m| m.unwrap())// Remove invalid JStrings
                     .map(|s| JValue::Object(*s)).collect(); // Convert to something usable
 
+                // Make array for main method, passing a slice of jstrings does not work
+                let arg_array = env.new_object_array(opts.len() as i32, "java/lang/String", env.new_string("").unwrap());
+                let args = arg_array.unwrap();
+                let mut i = 0;
+                for o in opts {
+                    let _ = env.set_object_array_element(args, i, o.l().unwrap());
+                    i = i + 1;
+                }
+
                 // Ensure correct format of main class
                 let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
 
                 // Call main method
-                let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &opts[..]);
+                let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &[JValue::from(JObject::from(args)),]);
 
                 // Launch failed
                 if let Err(e) = v {
