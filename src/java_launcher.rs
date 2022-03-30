@@ -1,10 +1,8 @@
-use std::any::Any;
 use std::path::{PathBuf};
 
 use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError};
-use jni::descriptors::Desc;
-use jni::objects::{JObject, JString, JValue};
-use jni::sys::{jint, JNIInvokeInterface_, jstring};
+use jni::objects::{JObject, JValue};
+use jni::sys::{jint, JNIInvokeInterface_};
 use crate::file_handler::get_jvm_paths;
 
 use crate::launch_config::LauncherConfig;
