@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use std::env;
+use std::{env, thread};
 
 use crate::display_handler::message;
 use crate::file_handler::{get_java_version_of_main};
@@ -19,7 +19,7 @@ fn main() {
     correct_directory();
 
     // todo comment when publishing
-    //std::env::set_current_dir("./../../test");
+    //env::set_current_dir("./../../test").expect("could not set test directory");
 
     launch();
 }
@@ -48,7 +48,13 @@ fn launch() {
     }
 
     // Run the app
-    create_and_run_jvm(&m)
+    // Done on a separate thread per the note in:
+    // https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#creating-the-vm
+    let handle = thread::spawn(move || {
+        create_and_run_jvm(&m)
+    });
+
+    handle.join().expect("Failed to wait for thread closure");
 }
 
 /// This makes sure the current working directory is the exe's home.<br>
@@ -57,10 +63,10 @@ fn launch() {
 fn correct_directory() {
     // This gets the location of the exe file, not its current working directory
     // These can differ if say running the exe through command line when in a different folder
-    let exe_home = std::env::current_exe();
+    let exe_home = env::current_exe();
     if let Ok(exe_home) = exe_home {
         if let Some(exe_home) = exe_home.parent() {
-            let _ = std::env::set_current_dir(exe_home);
+            let _ = env::set_current_dir(exe_home);
         }
     }
 }
