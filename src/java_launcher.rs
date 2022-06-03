@@ -1,3 +1,4 @@
+use std::iter::once;
 use std::path::{PathBuf};
 
 use jni::{InitArgs, InitArgsBuilder, JavaVM, JNIVersion, JvmError, sys};
@@ -104,6 +105,9 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
 fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
     if let Some(jvm_paths) = jvm_paths {
         for jvm_path in jvm_paths {
+            // Make sure the system can find the needed dynamic libraries
+            set_dynamic_library_lookup_loc(jvm_path);
+
             // This is needed for the lookup passed to with_libjvm
             let path_getter = || {
                 Ok(jvm_path.as_path())
@@ -118,7 +122,7 @@ fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts
             }
 
             if launch_opts.config.use_previous_jvm {
-                if let Some(old_jvm) = get_prev_jvm_made(jvm_path) {
+                if let Some(old_jvm) = get_prev_made_jvm(jvm_path) {
                     return Some(old_jvm)
                 }
             }
@@ -142,6 +146,30 @@ fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts
     None
 }
 
+/// Sets the DLL path to the bin folder of the Java runtime,
+/// needed for the dynamic libraries to load properly.
+/// Subsequent calls replace the path of the previous call.
+///
+/// see: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setdlldirectoryw
+#[cfg(windows)]
+fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
+    use winapi::um::winbase::{SetDllDirectoryW};
+    use std::os::windows::ffi::OsStrExt;
+    if let Some(jvm_dll_folder) = jvm_path.parent() {
+        if let Some(bin) = jvm_dll_folder.parent() {
+            let bin_as_lpcwstr: Vec<u16> = bin.as_os_str().encode_wide().chain(once(0)).collect();
+            unsafe {
+                SetDllDirectoryW(bin_as_lpcwstr.as_ptr());
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
+    // NO-OP at this time
+}
+
 /// Calls `DestroyJavaVM` of JNI - it blocks until all Java threads are closed <br>
 /// See <https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#unloading-the-vm>
 fn close_jvm(jvm: JavaVM) {
@@ -156,7 +184,7 @@ fn close_jvm(jvm: JavaVM) {
 
 /// Attempt to get the previously created JVM.<br>
 /// See <https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_getcreatedjavavms>
-fn get_prev_jvm_made(jvm_path: &PathBuf) -> Option<JavaVM> {
+fn get_prev_made_jvm(jvm_path: &PathBuf) -> Option<JavaVM> {
     let mut jvm_count: i32 = 88;
     let jvm_count_ptr: *mut i32 = &mut jvm_count;
     let mut jvm_buf: *mut sys::JavaVM = std::ptr::null_mut();
