@@ -175,7 +175,7 @@ pub fn parse_line(line: String) -> Vec<String> {
 /// Verify Java standard options (those beginning with `-X`).<br>
 /// If wrongly formatted, the JVM will fail on startup.
 fn verify_opt(input: String) -> String {
-    for opt in STANDARD_OPTS {
+    /*for opt in STANDARD_OPTS {//todo handle postfix char for size
         if input.starts_with(opt) {
             let numeral_part = &input[opt.len()..];
             if let Some(b) = numeral_part.chars().next().and_then(|c| Some(c.is_numeric())) {
@@ -186,7 +186,7 @@ fn verify_opt(input: String) -> String {
             println!("Launcher rejected a launch option ({}) due to incorrect format.", input);
             return "".to_string();
         }
-    }
+    }*/
     input
 }
 
