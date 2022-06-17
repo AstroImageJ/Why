@@ -23,8 +23,15 @@ const JVM_LOC_QUERIES: &'static [&str] = &[
     "C:/Program Files/Azul Systems/Zulu",
 ];
 
+#[cfg(windows)]
 /// Name of the dynamic Java library file.
 const DYN_JAVA_LIB: &str = "jvm.dll";
+#[cfg(macos)]
+/// Name of the dynamic Java library file.
+const DYN_JAVA_LIB: &str = "libjvm.dylib";
+#[cfg(linux)]
+/// Name of the dynamic Java library file.
+const DYN_JAVA_LIB: &str = "libjvm.so";
 
 /// Try and find the main class from the given classpath (without resolving it)
 /// and return its required Java version.
