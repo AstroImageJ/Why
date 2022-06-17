@@ -119,7 +119,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     }
 
     // Check system Java install
-    if launch_opts.config.allows_system_java && !jvm_paths.len() > 3 {
+    if launch_opts.config.allows_system_java && !jvm_paths.len() > 4 {
         if let Ok(path) = java_locator::locate_jvm_dyn_library() {
             let pb = PathBuf::from(path);
             if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
@@ -131,7 +131,20 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     }
 
     // Search fallback locations
-    if launch_opts.config.allows_java_location_lookup && !jvm_paths.len() > 3 {
+    if launch_opts.config.allows_java_location_lookup && !jvm_paths.len() > 4 {
+        // Search current directory if we don't have a path
+        if let Ok(c_dir) = std::env::current_dir() {
+            let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
+            if let Some(valid_path) = p {
+                if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                    if compatible {
+                        jvm_paths.push(valid_path);
+                    }
+                }
+            }
+        }
+
+        // Search common install locations
         for loc in JVM_LOC_QUERIES.iter() {
             let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
             if let Some(valid_path) = p {
