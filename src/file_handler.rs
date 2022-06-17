@@ -37,16 +37,29 @@ pub fn get_java_version_of_main(launch_cfg: &LauncherConfig) -> Option<u16> {
     // Go over the classpath
     return if let Some(classpath) = &launch_cfg.classpath {
         let jars: Vec<&str> = classpath.split(";").collect();
-        for jar_path in jars {
+        for jar_str in jars {
             // Open the jar
-            if let Ok(jar) = File::open(Path::new(jar_path)) {
-                if let Ok(mut zip_jar) = ZipArchive::new(jar) {
-                    // Find main class
-                    if let Ok(class) = zip_jar.by_name((launch_cfg.main_class
+            let jar_path = Path::new(jar_str);
+
+            if let Ok(jar) = File::open(jar_path) {
+                if jar_path.is_dir() {
+                    if let Ok(mut zip_jar) = ZipArchive::new(jar) {
+                        // Find main class
+                        if let Ok(class) = zip_jar.by_name((launch_cfg.main_class
+                            .as_ref().unwrap().to_string()
+                            .replace(".", "/") + ".class").as_str()) {
+                            // Found main class, get the version
+                            return read_class_version_to_java(class)
+                        }
+                    }
+                } else {
+                    if let Some(class) = find_file_with_path(jar_path, (launch_cfg.main_class
                         .as_ref().unwrap().to_string()
                         .replace(".", "/") + ".class").as_str()) {
-                        // Found main class, get the version
-                        return read_class_version_to_java(class)
+                        if let Ok(class_file) = File::open(class) {
+                            // Found main class, get the version
+                            return read_class_version_to_java(class_file)
+                        }
                     }
                 }
             }
@@ -168,6 +181,12 @@ fn valid_path(path: Option<PathBuf>) -> Option<PathBuf> {
             if p.exists() { Some(p) } else { None }
         }
     }
+}
+
+/// Locates a file in a given path at max depth 5
+/// Skips hidden files
+fn find_file_with_path<P: AsRef<Path>>(root: P, file: &str) -> Option<PathBuf> {
+    return find_file(root.as_ref().to_str()?, file)
 }
 
 /// Locates a file in a given path at max depth 5
