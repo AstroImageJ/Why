@@ -1,6 +1,6 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
-use std::fs::File;
+use std::fs::{File};
 use std::io::{Read};
 use std::path::{Path, PathBuf};
 use config::{Config, FileFormat};
@@ -108,7 +108,10 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
             if let Some(valid_path) = p {
                 if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                     if compatible {
-                        jvm_paths.push(valid_path);
+                        use dunce::canonicalize;
+                        if let Ok(resolved_path) = canonicalize(&*valid_path) {
+                            jvm_paths.push(resolved_path);
+                        }
                     }
                 }
             }
