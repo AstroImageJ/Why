@@ -1,6 +1,6 @@
 [package]
 name = "JavaLauncher"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["Kevin Eastridge"]
 edition = "2021"
 license = "LGPL-3.0"
