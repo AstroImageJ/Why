@@ -27,11 +27,8 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         return;
     }
 
-    // Try and find a valid JVM outside of `JAVA_HOME`
-    let jvm_paths = get_jvm_paths(launch_opts);
-
     // The launch attempt
-    if let Some(jvm) = try_launch_jvm(&jvm_paths, launch_opts) {
+    if let Some(jvm) = try_launch_jvm(launch_opts) {
         // Attach the current thread to call into Java
         // This method returns the guard that will detach the current thread when dropped,
         // also freeing any local references created in it
@@ -102,11 +99,13 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
 }
 
 /// Create the JVM if possible
-fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts) -> Option<JavaVM> {
-    if let Some(jvm_paths) = jvm_paths {
-        for jvm_path in jvm_paths {
+fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
+    let path_getters = get_jvm_paths(launch_opts);
+    let count = path_getters.len();
+    for jvm_path_f in path_getters {
+        if let Some(jvm_path) = (jvm_path_f)(launch_opts) {
             // Make sure the system can find the needed dynamic libraries
-            set_dynamic_library_lookup_loc(jvm_path);
+            set_dynamic_library_lookup_loc(&jvm_path);
 
             // This is needed for the lookup passed to with_libjvm
             let path_getter = || {
@@ -122,7 +121,7 @@ fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts
             }
 
             if launch_opts.config.use_previous_jvm {
-                if let Some(old_jvm) = get_prev_made_jvm(jvm_path) {
+                if let Some(old_jvm) = get_prev_made_jvm(&jvm_path) {
                     return Some(old_jvm)
                 }
             }
@@ -137,11 +136,11 @@ fn try_launch_jvm(ref jvm_paths: &Option<Vec<PathBuf>>, launch_opts: &LaunchOpts
                 }
             }
         }
-        if jvm_paths.len() > 0 {
-            message("A valid Java installation was found, failed to start.\n\
+    }
+    if count > 0 {
+        message("A valid Java installation was found, failed to start.\n\
                 Please check the launch arguments as they may be invalid.\n\
                 Please contact the developers.")
-        }
     }
     None
 }

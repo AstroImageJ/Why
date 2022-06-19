@@ -1,6 +1,7 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
 use std::env;
+use std::fmt::Error;
 use std::fs::{File};
 use std::io::{Read};
 use std::path::{Path, PathBuf};
@@ -85,85 +86,107 @@ pub fn get_java_version_of_main(launch_cfg: &LauncherConfig) -> Option<u16> {
 /// If [`Config::allows_java_location_lookup`] is `true`,
 /// will search [`JVM_LOC_QUERIES`] for a valid path.<br>
 /// Also checks Java version for compatibility, find at most 3 JVMs to attempt.
-pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
-    let mut jvm_paths: Vec<PathBuf> = vec![];
-    let min_java_ver = launch_opts.config.min_java.unwrap_or(0) as i32;
+pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> {
+    let mut jvm_paths: Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> = Vec::new();
 
     match &launch_opts.config.jvm_path {
         // Search current directory
         None => {
-            if let Ok(c_dir) = env::current_dir() {
-                let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
-                if let Some(valid_path) = p {
-                    if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
-                        if compatible {
-                            jvm_paths.push(valid_path);
+            jvm_paths.push(Box::new(|opts: &LaunchOpts| {
+                let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
+                if let Ok(c_dir) = env::current_dir() {
+                    let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
+                    if let Some(valid_path) = p {
+                        if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                            if compatible {
+                                return Some(valid_path);
+                            }
                         }
                     }
                 }
-            }
+                return None;
+            }));
         }
         // Search specified directory
-        Some(path_str) => {
-            let p = valid_path(find_file(path_str, DYN_JAVA_LIB));
-            if let Some(valid_path) = p {
-                if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
-                    if compatible {
-                        use dunce::canonicalize;
-                        if let Ok(resolved_path) = canonicalize(&*valid_path) {
-                            jvm_paths.push(resolved_path);
+        Some(_) => {
+            jvm_paths.push(Box::new(|opts: &LaunchOpts| {
+                let min_java_ver = (&opts.config.min_java).unwrap_or(0) as i32;
+                if let Some(path) = &opts.config.jvm_path {
+                    let p = valid_path(find_file(path, DYN_JAVA_LIB));
+                    if let Some(valid_path) = p {
+                        if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                            if compatible {
+                                use dunce::canonicalize;
+                                if let Ok(resolved_path) = canonicalize(&*valid_path) {
+                                    return Some(resolved_path);
+                                }
+                            }
                         }
                     }
                 }
-            }
+                return None;
+            }));
         }
     }
 
     // Check system Java install
     if launch_opts.config.allows_system_java && !jvm_paths.len() > 4 {
-        match &env::var("JAVA_HOME") {
-            Ok(path) if !path.is_empty() => {
-                let pb = PathBuf::from(path);
-                if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
-                    if compatible {
-                        jvm_paths.push(pb);
+        jvm_paths.push(Box::new(|opts: &LaunchOpts| {
+            match &env::var("JAVA_HOME") {
+                Ok(path) if !path.is_empty() => {
+                    let pb = PathBuf::from(path);
+                    let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
+                    if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
+                        if compatible {
+                            return Some(pb);
+                        }
                     }
                 }
+                _ => {
+                }
             }
-            _ => {
-            }
-        }
+            return None;
+        }));
     }
 
     // Search fallback locations
     if launch_opts.config.allows_java_location_lookup && !jvm_paths.len() > 4 {
         // Search current directory if we don't have a path
-        if let Ok(c_dir) = env::current_dir() {
-            let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
-            if let Some(valid_path) = p {
-                if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
-                    if compatible {
-                        jvm_paths.push(valid_path);
+        jvm_paths.push(Box::new(|opts: &LaunchOpts| {
+            if let Ok(c_dir) = env::current_dir() {
+                let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
+                if let Some(valid_path) = p {
+                    let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
+                    if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                        if compatible {
+                            return Some(valid_path);
+                        }
                     }
                 }
             }
-        }
+            return None;
+        }));
 
         // Search common install locations
         for loc in JVM_LOC_QUERIES.iter() {
-            let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
-            if let Some(valid_path) = p {
-                if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
-                    if compatible {
-                        jvm_paths.push(valid_path);
+            jvm_paths.push(Box::new(|opts: &LaunchOpts| {
+                let p = valid_path(find_file(process_path(loc).as_str(), DYN_JAVA_LIB));
+                if let Some(valid_path) = p {
+                    let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
+                    if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                        if compatible {
+                            return Some(valid_path);
+                        }
                     }
                 }
-            }
+                return None;
+            }));
+
             if jvm_paths.len() > 3 { break }
         }
     }
 
-    Some(jvm_paths)
+    jvm_paths
 }
 
 /// This checks the path of the Java dynamic library for a `release` file,
