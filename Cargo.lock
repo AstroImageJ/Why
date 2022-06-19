@@ -9,7 +9,6 @@ dependencies = [
  "config",
  "dirs",
  "dunce",
- "java-locator",
  "jni",
  "libloading 0.7.3",
  "sysinfo",

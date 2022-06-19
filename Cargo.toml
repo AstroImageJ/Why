@@ -10,12 +10,11 @@ license = "LGPL-3.0"
 [dependencies]
 # See https://github.com/jni-rs/jni-rs/pull/293 linking to path only is silly
 jni = { git = "https://github.com/AstroImageJ/jni-rs", branch = "dyn-load-jvm", features = ["invocation", "invocation-dyn"] }
-walkdir = "2"
+walkdir = "2"#todo replace w/ https://rust-lang-nursery.github.io/rust-cookbook/file/dir.html ?
 config = "0.12.0"
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["winuser"] }
 dirs = "4.0.0"
-java-locator = "0.1.2"
 sysinfo = "0.23.5"
 zip = { version = "0.6"}
 libloading = "0.7"

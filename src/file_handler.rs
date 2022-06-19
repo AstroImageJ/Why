@@ -1,5 +1,6 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
+use std::env;
 use std::fs::{File};
 use std::io::{Read};
 use std::path::{Path, PathBuf};
@@ -120,12 +121,16 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
 
     // Check system Java install
     if launch_opts.config.allows_system_java && !jvm_paths.len() > 4 {
-        if let Ok(path) = java_locator::locate_jvm_dyn_library() {
-            let pb = PathBuf::from(path);
-            if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
-                if compatible {
-                    jvm_paths.push(pb);
+        match &env::var("JAVA_HOME") {
+            Ok(path) if !path.is_empty() => {
+                let pb = PathBuf::from(path);
+                if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
+                    if compatible {
+                        jvm_paths.push(pb);
+                    }
                 }
+            }
+            _ => {
             }
         }
     }
