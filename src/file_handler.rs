@@ -92,7 +92,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     match &launch_opts.config.jvm_path {
         // Search current directory
         None => {
-            if let Ok(c_dir) = std::env::current_dir() {
+            if let Ok(c_dir) = env::current_dir() {
                 let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
                 if let Some(valid_path) = p {
                     if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
@@ -138,7 +138,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Option<Vec<PathBuf>> {
     // Search fallback locations
     if launch_opts.config.allows_java_location_lookup && !jvm_paths.len() > 4 {
         // Search current directory if we don't have a path
-        if let Ok(c_dir) = std::env::current_dir() {
+        if let Ok(c_dir) = env::current_dir() {
             let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
             if let Some(valid_path) = p {
                 if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
