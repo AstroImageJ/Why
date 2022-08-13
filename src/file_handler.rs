@@ -121,6 +121,8 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                                     return Some(resolved_path);
                                 }
                             }
+                        } else if min_java_ver == 0 {
+                            return Some(valid_path);
                         }
                     }
                 }
