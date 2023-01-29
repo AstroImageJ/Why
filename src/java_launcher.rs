@@ -105,6 +105,7 @@ fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
     for jvm_path_f in path_getters {
         if let Some(jvm_path) = (jvm_path_f)(launch_opts) {
             // Make sure the system can find the needed dynamic libraries
+            // not really needed now that the paths are fully resolved
             set_dynamic_library_lookup_loc(&jvm_path);
 
             // This is needed for the lookup passed to with_libjvm

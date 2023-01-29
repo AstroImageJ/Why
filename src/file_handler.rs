@@ -99,7 +99,10 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                     if let Some(valid_path) = p {
                         if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                             if compatible {
-                                return Some(valid_path);
+                                use dunce::canonicalize;
+                                if let Ok(resolved_path) = canonicalize(&*valid_path) {
+                                    return Some(resolved_path);
+                                }
                             }
                         }
                     }
@@ -140,7 +143,10 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                     let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
                     if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
                         if compatible {
-                            return Some(pb);
+                            use dunce::canonicalize;
+                            if let Ok(resolved_path) = canonicalize(&*pb) {
+                                return Some(resolved_path);
+                            }
                         }
                     }
                 }
@@ -161,7 +167,10 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                     let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
                     if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                         if compatible {
-                            return Some(valid_path);
+                            use dunce::canonicalize;
+                            if let Ok(resolved_path) = canonicalize(&*valid_path) {
+                                return Some(resolved_path);
+                            }
                         }
                     }
                 }
@@ -177,7 +186,10 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                     let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
                     if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                         if compatible {
-                            return Some(valid_path);
+                            use dunce::canonicalize;
+                            if let Ok(resolved_path) = canonicalize(&*valid_path) {
+                                return Some(resolved_path);
+                            }
                         }
                     }
                 }
