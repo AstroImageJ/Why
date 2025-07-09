@@ -1,6 +1,6 @@
 [package]
 name = "JavaLauncher"
-version = "1.1.2"
+version = "2.0.0"
 authors = ["Kevin Eastridge"]
 edition = "2021"
 license = "LGPL-3.0"
@@ -19,6 +19,13 @@ sysinfo = "0.23.5"
 zip = { version = "0.6"}
 libloading = "0.7"
 dunce = "1.0.2"
+config = "0.15.12"
+[target.'cfg(target_os = "windows")'.dependencies]
+dirs = "6.0.0"
+sysinfo = "0.35.2"
+zip = "4.2.0"
+libloading = "0.8.8"
+dunce = "1.0.5"
 
 # From https://github.com/johnthagen/min-sized-rust
 [profile.release]

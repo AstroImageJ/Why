@@ -1,9 +1,9 @@
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 extern crate winapi;
 
 use std::io::Error;
 
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 fn print_message(msg: &str) -> Result<i32, Error> {
     use std::ffi::OsStr;
     use std::iter::once;

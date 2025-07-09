@@ -7,7 +7,7 @@ use jni::sys::{jint, JNI_OK, JNIInvokeInterface_, jsize};
 use crate::file_handler::get_jvm_paths;
 
 use crate::launch_config::LauncherConfig;
-use crate::message;
+use crate::{message, DEBUG};
 
 /// The launcher options, such as JVM args and where the JVM is located.
 #[derive(Debug)]
@@ -43,6 +43,10 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                     .filter(|m| m.is_ok()).map(|m| m.unwrap())// Remove invalid JStrings
                     .map(|s| JValue::Object(*s)).collect(); // Convert to something usable
 
+                if DEBUG {
+                    println!("{:?}", launch_opts.program_opts);
+                }
+                
                 // Make array for main method, passing a slice of jstrings does not work
                 let arg_array = env.new_object_array(opts.len() as i32, "java/lang/String", env.new_string("").unwrap());
                 let args = arg_array.unwrap();
@@ -50,10 +54,18 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 for o in opts {
                     let _ = env.set_object_array_element(args, i, o.l().unwrap());
                     i = i + 1;
+
+                    if DEBUG {
+                        println!("Unwrap: {:?}", o.l().unwrap());
+                    }
                 }
 
                 // Ensure correct format of main class
                 let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
+
+                if DEBUG {
+                    println!("{:?}", args);
+                }
 
                 // Call main method
                 let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &[JValue::from(JObject::from(args)),]);
@@ -151,7 +163,7 @@ fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
 /// Subsequent calls replace the path of the previous call.
 ///
 /// see: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setdlldirectoryw
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
     use winapi::um::winbase::{SetDllDirectoryW};
     use std::os::windows::ffi::OsStrExt;
@@ -165,7 +177,7 @@ fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(target_os = "windows"))]
 fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
     // NO-OP at this time
 }
@@ -192,7 +204,7 @@ fn get_prev_made_jvm(jvm_path: &PathBuf) -> Option<JavaVM> {
     unsafe {
         let lib = libloading::Library::new(jvm_path).ok()?;
         let f: libloading::
-        Symbol<unsafe extern fn(vm_buf: *mut *mut sys::JavaVM, buf_len: jsize, n_vms: *mut jsize) -> jint> =
+        Symbol<unsafe extern "C" fn(vm_buf: *mut *mut sys::JavaVM, buf_len: jsize, n_vms: *mut jsize) -> jint> =
             lib.get(b"JNI_GetCreatedJavaVMs").ok()?;
         let r = f(jvm_buf_ptr, 1, jvm_count_ptr);
         if r == JNI_OK && jvm_count > 0 {
@@ -211,6 +223,9 @@ fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
         .ignore_unrecognized(true);
 
     for jvm_opt in &launch_opts.jvm_opts {
+        if DEBUG {
+            println!("{:?}", jvm_opt);
+        }
         jvm_args = jvm_args.option(jvm_opt.as_str());
     }
 

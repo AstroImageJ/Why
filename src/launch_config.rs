@@ -4,8 +4,8 @@ use std::io::BufRead;
 use std::path::Path;
 
 use config::{Config, FileFormat};
-use sysinfo::{System, SystemExt};
-use crate::get_java_version_of_main;
+use sysinfo::{System};
+use crate::{get_java_version_of_main, DEBUG};
 
 /// These module paths must be in the form of opt=value
 const MODULE_OPTS: &'static [&str] = &["--add-reads", "--add-exports", "--add-opens",
@@ -119,6 +119,11 @@ impl LauncherConfig {
     /// sanitizing and correcting where possible.
     pub fn read_launch_opts(&self) -> Vec<String> {
         let mut out: Vec<String> = vec![];
+
+        if DEBUG {
+            println!("Read file: {:?}", self.launch_options_file);
+        }
+
         if self.launch_options_file.as_ref().is_some() {
             if let Ok(lines) = read_lines(self.launch_options_file.as_ref().unwrap().as_str()) {
                 // Consumes the iterator, returns an (Optional) String
@@ -205,6 +210,9 @@ fn verify_line(mut line: String) -> String {
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     where P: AsRef<Path>, {
     let file = File::open(filename)?;
+    if DEBUG {
+        println!("{:?}", file);
+    }
     Ok(io::BufReader::new(file).lines())
 }
 

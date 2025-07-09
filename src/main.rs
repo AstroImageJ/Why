@@ -1,9 +1,7 @@
-#![windows_subsystem = "windows"]
-
 use std::{env, thread};
 
 use crate::display_handler::message;
-use crate::file_handler::{get_java_version_of_main};
+use crate::file_handler::get_java_version_of_main;
 use crate::java_launcher::{create_and_run_jvm, LaunchOpts};
 use crate::launch_config::LauncherConfig;
 
@@ -11,6 +9,8 @@ mod display_handler;
 mod java_launcher;
 mod launch_config;
 mod file_handler;
+
+pub const DEBUG: bool = false;
 
 /// Entrypoint
 fn main() {

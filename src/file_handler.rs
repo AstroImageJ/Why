@@ -1,14 +1,13 @@
+use crate::{LaunchOpts, LauncherConfig};
+use config::{Config, FileFormat};
 use core::option::Option;
 use core::option::Option::{None, Some};
 use std::env;
-use std::fmt::Error;
-use std::fs::{File};
-use std::io::{Read};
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use config::{Config, FileFormat};
 use walkdir::{DirEntry, WalkDir};
 use zip::ZipArchive;
-use crate::{LauncherConfig, LaunchOpts};
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
 const JVM_LOC_QUERIES: &'static [&str] = &[
@@ -25,13 +24,13 @@ const JVM_LOC_QUERIES: &'static [&str] = &[
     "C:/Program Files/Azul Systems/Zulu",
 ];
 
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 /// Name of the dynamic Java library file.
 const DYN_JAVA_LIB: &str = "jvm.dll";
-#[cfg(macos)]
+#[cfg(target_os = "macos")]
 /// Name of the dynamic Java library file.
 const DYN_JAVA_LIB: &str = "libjvm.dylib";
-#[cfg(linux)]
+#[cfg(target_os = "linux")]
 /// Name of the dynamic Java library file.
 const DYN_JAVA_LIB: &str = "libjvm.so";
 
