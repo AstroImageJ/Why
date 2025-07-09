@@ -67,6 +67,8 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                     println!("{:?}", args);
                 }
 
+                //todo test passing -jar jar as startup arg, how to forward args?
+
                 // Call main method
                 let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &[JValue::from(JObject::from(args)),]);
 

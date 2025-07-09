@@ -10,7 +10,7 @@ use walkdir::{DirEntry, WalkDir};
 use zip::ZipArchive;
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
-const JVM_LOC_QUERIES: &'static [&str] = &[
+const JVM_LOC_QUERIES: &'static [&str] = &[//todo expand for linux/mac
     "$USER$/.gradle/jdks",
     "C:/Program Files/Java",
     "C:/Program Files/AdoptOpenJDK",

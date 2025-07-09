@@ -1,9 +1,9 @@
 use std::{env, thread};
-
+use std::path::Path;
 use crate::display_handler::message;
 use crate::file_handler::get_java_version_of_main;
 use crate::java_launcher::{create_and_run_jvm, LaunchOpts};
-use crate::launch_config::LauncherConfig;
+use crate::launch_config::{get_jvm_options, parse_config, LauncherConfig};
 
 mod display_handler;
 mod java_launcher;
@@ -16,21 +16,24 @@ pub const DEBUG: bool = false;
 fn main() {
     println!("Launcher starting!");
 
-    correct_directory();
-
-    // todo comment when publishing
-    //env::set_current_dir("./../../test").expect("could not set test directory");
+    // todo true when publishing
+    if true {
+        correct_directory();
+    } else {
+        env::set_current_dir("./test").expect("could not set test directory");
+        println!("{:?}", env::current_dir());
+    }
 
     launch();
 }
 
 /// Setup the environment and launch the application
 fn launch() {
+    let cfgPath = env::current_exe().unwrap().with_extension(".cfg");
+
     // Build launch opts
     let mut m = LaunchOpts {
-        config: LauncherConfig {
-            ..LauncherConfig::read_file()
-        },
+        config: parse_config(cfgPath).unwrap(),
         jvm_opts: vec![],                    //this can be relative
         program_opts: env::args().collect(), // Forward launch args to the app
     };
@@ -41,20 +44,14 @@ fn launch() {
     }
 
     // Build classpath
-    m.jvm_opts.append(&mut m.config.read_launch_opts());
+    m.jvm_opts.append(&mut get_jvm_options(&m.config));
     if m.config.classpath.is_some() {
         m.jvm_opts
             .push("-Djava.class.path=".to_string() + &*m.config.classpath.as_ref().unwrap());
     }
 
     // Run the app
-    // Done on a separate thread per the note in:
-    // https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#creating-the-vm
-    let handle = thread::spawn(move || {
-        create_and_run_jvm(&m)
-    });
-
-    handle.join().expect("Failed to wait for thread closure");
+    create_and_run_jvm(&m)
 }
 
 /// This makes sure the current working directory is the exe's home.<br>
