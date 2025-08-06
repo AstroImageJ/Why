@@ -6,13 +6,13 @@ use jni::objects::{JObject, JValue};
 use jni::sys::{jint, JNI_OK, JNIInvokeInterface_, jsize};
 use crate::file_handler::get_jvm_paths;
 
-use crate::launch_config::LauncherConfig;
+use crate::launch_config::{JPackageLaunchConfig, LaunchConfig};
 use crate::{message, DEBUG};
 
 /// The launcher options, such as JVM args and where the JVM is located.
 #[derive(Debug)]
 pub struct LaunchOpts {
-    pub config: LauncherConfig,
+    pub config: LaunchConfig,
     pub jvm_opts: Vec<String>,
     pub program_opts: Vec<String>,
 }
@@ -20,13 +20,6 @@ pub struct LaunchOpts {
 /// Create the JVM, attach to it, and run the `main` method of the given `launch_opts`.<br>
 /// Blocks until the JVM has shut down.
 pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
-    // Not enough information provided in the launcher config
-    if !launch_opts.config.validate() {
-        message("Invalid launcher config.\n\
-        Please contact the developers.");
-        return;
-    }
-
     // The launch attempt
     if let Some(jvm) = try_launch_jvm(launch_opts) {
         // Attach the current thread to call into Java
@@ -61,13 +54,12 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 }
 
                 // Ensure correct format of main class
-                let main_class = launch_opts.config.main_class.as_ref().unwrap().replace(".", "/");
+                let main_class = launch_opts.config.main_class.replace(".", "/");
 
                 if DEBUG {
+                    println!("{:?}", main_class);
                     println!("{:?}", args);
                 }
-
-                //todo test passing -jar jar as startup arg, how to forward args?
 
                 // Call main method
                 let v = env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &[JValue::from(JObject::from(args)),]);
@@ -99,7 +91,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
     } else {
         // Error messages
         // String formatting? What's that?
-        let version = launch_opts.config.min_java.unwrap_or(0);
+        let version = 0;//launch_opts.config.min_java.unwrap_or(0);
         let mut inst = "any Java.".to_owned();
         if version > 0 {
             let mut x = "Java ".to_owned();
@@ -135,10 +127,14 @@ fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
                 return None;
             }
 
-            if launch_opts.config.use_previous_jvm {
+            if false {
                 if let Some(old_jvm) = get_prev_made_jvm(&jvm_path) {
                     return Some(old_jvm)
                 }
+            }
+
+            if DEBUG {
+                println!("{:?}", launch_opts);
             }
 
             // Create a new VM
@@ -167,7 +163,7 @@ fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
 /// see: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setdlldirectoryw
 #[cfg(target_os = "windows")]
 fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
-    use winapi::um::winbase::{SetDllDirectoryW};
+    use windows_sys::Win32::System::LibraryLoader::{SetDllDirectoryW};
     use std::os::windows::ffi::OsStrExt;
     if let Some(jvm_dll_folder) = jvm_path.parent() {
         if let Some(bin) = jvm_dll_folder.parent() {

@@ -1,5 +1,4 @@
-use crate::{LaunchOpts, LauncherConfig};
-use config::{Config, FileFormat};
+use crate::{LaunchOpts, JPackageLaunchConfig};
 use core::option::Option;
 use core::option::Option::{None, Some};
 use std::env;
@@ -36,13 +35,10 @@ const DYN_JAVA_LIB: &str = "libjvm.so";
 
 /// Try and find the main class from the given classpath (without resolving it)
 /// and return its required Java version.
-pub fn get_java_version_of_main(launch_cfg: &LauncherConfig) -> Option<u16> {
-    // Not enough info provided
-    if !launch_cfg.validate() {
-        return None
-    }
-
-    // Go over the classpath
+pub fn get_java_version_of_main(launch_cfg: &JPackageLaunchConfig) -> Option<u16> {
+    None
+    //todo handle
+    /*// Go over the classpath
     return if let Some(classpath) = &launch_cfg.classpath {
         let jars: Vec<&str> = classpath.split(";").collect();
         for jar_str in jars {
@@ -75,7 +71,7 @@ pub fn get_java_version_of_main(launch_cfg: &LauncherConfig) -> Option<u16> {
         None
     } else {
         None
-    }
+    }*/
 }
 
 /// Get all valid paths to [`DYN_JAVA_LIB`],
@@ -88,8 +84,9 @@ pub fn get_java_version_of_main(launch_cfg: &LauncherConfig) -> Option<u16> {
 pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> {
     let mut jvm_paths: Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> = Vec::new();
 
-    match &launch_opts.config.jvm_path {
+    match &launch_opts.config.runtime {
         // Search current directory
+        //todo this needs changes
         None => {
             jvm_paths.push(Box::new(|opts: &LaunchOpts| {
                 let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
@@ -113,8 +110,8 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
         Some(_) => {
             jvm_paths.push(Box::new(|opts: &LaunchOpts| {
                 let min_java_ver = (&opts.config.min_java).unwrap_or(0) as i32;
-                if let Some(path) = &opts.config.jvm_path {
-                    let p = valid_path(find_file(path, DYN_JAVA_LIB));
+                if let Some(path) = &opts.config.runtime {
+                    let p = valid_path(find_file(path.to_str().unwrap_or(""), DYN_JAVA_LIB));
                     if let Some(valid_path) = p {
                         if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                             if compatible {
@@ -133,8 +130,9 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
         }
     }
 
+    //todo handle
     // Check system Java install
-    if launch_opts.config.allows_system_java && !jvm_paths.len() > 4 {
+    /*if launch_opts.config.allows_system_java && !jvm_paths.len() > 4 {
         jvm_paths.push(Box::new(|opts: &LaunchOpts| {
             match &env::var("JAVA_HOME") {
                 Ok(path) if !path.is_empty() => {
@@ -197,7 +195,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
 
             if jvm_paths.len() > 3 { break }
         }
-    }
+    }*/
 
     jvm_paths
 }
@@ -207,25 +205,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
 /// returns `Some(found_ver >= req_ver)` or `None` if the `release` could not be found,
 /// or another error occurs.
 fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
-    // First we go up 3 levels from jvm.dll path to get runtime info
-    let mut java_folder = jvm_path.to_path_buf();
-    for _ in 0..3 {
-        if let Some(r) = java_folder.parent() {
-            java_folder = r.to_path_buf();
-        }
-    }
 
-    // Try and get the Java version of the installation
-    if let Some(release_path) = valid_path(find_file(java_folder.to_str()?, "release")) {
-        let release_info = Config::builder()
-            .add_source(config::File::from(release_path).format(FileFormat::Ini))
-            .build().ok()?;
-        let ver_str = release_info.get_string("JAVA_VERSION").ok()?;
-        let parts: Vec<&str> = ver_str.split(".").collect();
-        let ver = parts.first()?.parse::<i32>().unwrap();
-
-        return Some(ver >= req_ver);
-    }
 
     return None;
 }
@@ -325,4 +305,60 @@ fn read_class_version_to_java<R: Read>(mut reader: R) -> Option<u16> {
     } else {
         None
     }
+}
+
+/// The path to the `app` folder.
+#[cfg(target_os = "windows")]
+pub fn get_app_dir_path() -> PathBuf {
+    get_app_image_root().join("app")
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_default_runtime_path() -> PathBuf {
+    get_app_image_root().join("runtime")
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_app_image_root() -> PathBuf {
+    std::env::current_exe().unwrap()
+        //.parent().unwrap()
+        .parent().unwrap().to_owned()
+}
+
+/// The path to the `app` folder.
+#[cfg(target_os = "linux")]
+pub fn get_app_dir_path() -> PathBuf {
+    get_app_image_root().join("lib").join("app")
+}
+
+#[cfg(target_os = "linux")]
+pub fn get_default_runtime_path() -> PathBuf {
+    get_app_image_root().join("lib").join("runtime")
+}
+
+#[cfg(target_os = "linux")]
+pub fn get_app_image_root() -> PathBuf {
+    std::env::current_exe().unwrap()
+        .parent().unwrap()
+        .parent().unwrap().to_owned()
+}
+
+/// The path to the `app` folder.
+#[cfg(target_os = "macos")]
+pub fn get_app_dir_path() -> PathBuf {
+    get_app_image_root().join("Contents").join("app")
+}
+
+#[cfg(target_os = "macos")]
+pub fn get_default_runtime_path() -> PathBuf {
+    get_app_image_root().join("Contents").join("runtime")
+}
+
+#[cfg(target_os = "macos")]
+pub fn get_app_image_root() -> PathBuf {
+    std::env::current_exe().unwrap()
+        .parent().unwrap()
+        .parent().unwrap()
+        .parent().unwrap()
+        .parent().unwrap().to_owned()
 }

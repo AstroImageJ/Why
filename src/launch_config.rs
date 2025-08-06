@@ -1,230 +1,213 @@
-use std::fs::File;
-use std::io;
-use std::io::BufRead;
-use std::path::Path;
-
-use config::{Config, FileFormat};
-use sysinfo::{System};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{self, BufRead, BufReader},
+    path::Path,
+};
+use std::path::PathBuf;
+use zip::ZipArchive;
 use crate::{get_java_version_of_main, DEBUG};
+use crate::file_handler::{get_app_dir_path, get_app_image_root, get_default_runtime_path};
+use crate::manifest_handler::read_manifest;
 
-/// These module paths must be in the form of opt=value
-const MODULE_OPTS: &'static [&str] = &["--add-reads", "--add-exports", "--add-opens",
-    "--add-modules", "--limit-modules", "--module-path",
-    "--patch-module", "--upgrade-module-path"];
+#[cfg(target_os = "windows")]
+const SEPARATOR: &str = ";";
 
-/// The options must match the form accepted by the JVM, otherwise a crash will occur
-/// This is only a sampling of commonly used ones to prevent user error.
-/// These options are assumed to contain numbers
-const STANDARD_OPTS: &'static [&str] = &["-Xmx", "-Xms"];
+#[cfg(not(target_os = "windows"))]
+const SEPARATOR: &str = ":";
 
-/// These are read in from launcher.ini from the current working directory
+/// A map of keys to all their values within a section.
+pub type Section = HashMap<String, Vec<String>>;
+
+/// The full config: section name → Section.
+pub type JPackageLaunchConfig = HashMap<String, Section>;
+
+//todo struct of LauncherConfig that specifies main class, min java (parsed from class file), etc
+//todo handle jre path and jre discovery
+//read from manifest for building rest of the entries
+//read classpath from manifest
+
 #[derive(Debug)]
-pub struct LauncherConfig {
-    /// key: jvm_install; format: String (path), can be relative by preceding with './';
-    /// what it does: the path to the location of the jvm.dll -
-    /// it will recursively search into this path up to a depth of 5 for the jvm.dll
-    /// REQUIRED if allows_system_java and allows_java_lookup are disabled
-    pub jvm_path: Option<String>,
-    /// key: mainclass; format: String (as it would appear in a jar manifest);
-    /// what it does: the main class, as it would appear in a jar manifest
-    /// REQUIRED
-    pub main_class: Option<String>,
-    /// key: launch_options; format: String (path), can be relative by preceding with './';
-    /// what it does: the Launch4J-style config to read JVM options from
-    pub launch_options_file: Option<String>,
-    /// key: classpath; format: same as the launch argument - ';' separated paths;
-    /// what it does: sets the classpath; If given a jar, it will respect the jar
-    /// manifest's classpath entry
-    /// REQUIRED
-    pub classpath: Option<String>,
-    /// key: min_java; format: integer; what it does: only tries to run Java that is
-    /// equal to or greater than this Java version
-    pub min_java: Option<i64>,
-    /// key: allow_system_java; format: boolean; what it does: whether the launcher
-    /// should use the Java listed in JAVA_HOME
-    pub allows_system_java: bool,
-    /// key: allow_java_location_lookup; format: boolean;
-    /// what it does: whether the launcher should check common Java
-    /// installation directories for a Java install
-    pub allows_java_location_lookup: bool,
-    /// key: maximum_heap_percentage; format: integer;
-    /// what it does: sets the -Xmx to this value if missing from the launch args.
-    pub max_mem_percent: Option<i64>,
-    /// key: check_main_class; format: boolean;
-    /// what it does: whether the launcher should check check the main class' Java version
-    /// requirement and use that as the min_java if the current min_java is not specified or
-    /// less than the found main class requirement. Otherwise, use the specified min_java.
-    pub check_main_class: bool,
-    /// key: use_previous_jvm; format: boolean;
-    /// what it does: whether the launcher should check if the selected JVM has a previous
-    /// instance opened, and if so, use that instance instead of making a new one.<br>
-    /// On Linux and Windows, it is typical to open a new instance of the application for file
-    /// associations, this allows that behavior to be overruled.
-    pub use_previous_jvm: bool,
+pub struct LaunchConfig {
+    pub main_class: String,
+    pub runtime: Option<PathBuf>,
+    pub min_java: Option<u16>,
+    pub java_opts: Vec<String>,
+    pub classpath: Vec<String>,
 }
 
-/// Sets the defaults
-impl Default for LauncherConfig {
-    fn default() -> Self {
-        LauncherConfig {
-            jvm_path: None,
-            main_class: None,
-            classpath: None,
-            min_java: None,
-            max_mem_percent: None,
-            launch_options_file: None,
-            allows_system_java: true,
-            allows_java_location_lookup: true,
-            check_main_class: true,
-            use_previous_jvm: false,
-        }
-    }
-}
+/// Parse an INI‑style file at `path` into a `Config`,
+/// preserving duplicate keys as multiple values.
+/// See https://github.com/openjdk/jdk/blob/master/src/jdk.jpackage/share/native/applauncher/CfgFile.cpp#L198
+pub fn parse_config<P: AsRef<Path>>(path: P) -> io::Result<JPackageLaunchConfig> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut config = JPackageLaunchConfig::new();
+    // Default section for keys before any [section]
+    let mut current_section = String::from("default");
 
-impl LauncherConfig {
-    /// Ensure that enough information is provided to actually start Java
-    pub fn validate(&self) -> bool {
-        self.main_class.is_some() && self.classpath.is_some()
-    }
+    for line in reader.lines() {
+        let line = line?;
+        let line = line.trim();
 
-    /// Read `launcher.ini` and setup the launcher config.<br>
-    /// This will also ensure that the main class can be run by the minimum Java requirement,
-    /// if enabled.
-    pub fn read_file() -> Self {
-        let config_file = Config::builder()
-            .add_source(config::File::new("launcher.ini", FileFormat::Ini))
-            .build();
-        return if let Ok(c) = config_file {
-            let mut cfg = LauncherConfig {
-                main_class: c.get_string("mainclass").ok(),
-                classpath: c.get_string("classpath").ok(),
-                jvm_path: c.get_string("jvm_install").ok(),
-                min_java: c.get_int("min_java").ok(),
-                launch_options_file: c.get_string("launch_options").ok(),
-                allows_system_java: c.get_bool("allow_system_java").unwrap_or(true),
-                allows_java_location_lookup: c.get_bool("allow_java_location_lookup").unwrap_or(true),
-                max_mem_percent: c.get_int("maximum_heap_percentage").ok(),
-                check_main_class: c.get_bool("check_main_class").unwrap_or(true),
-                use_previous_jvm: c.get_bool("use_previous_jvm").unwrap_or(false),
-                ..Default::default()
-            };
-            cfg.ensure_correct_java();
-            cfg
-        } else {
-            Default::default()
-        };
-    }
+        let line = line
+            .replace("$APPDIR", get_app_dir_path().to_str().unwrap())
+            .replace("$ROOTDIR", get_app_image_root().to_str().unwrap())
+            .replace("$BINDIR", std::env::current_exe()?.parent().unwrap().to_str().unwrap());
 
-    /// Read `launch_options_file` into a series of launch options,
-    /// sanitizing and correcting where possible.
-    pub fn read_launch_opts(&self) -> Vec<String> {
-        let mut out: Vec<String> = vec![];
-
-        if DEBUG {
-            println!("Read file: {:?}", self.launch_options_file);
+        // Skip blank lines and comments
+        // Jpackage only supports ; for comments
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
         }
 
-        if self.launch_options_file.as_ref().is_some() {
-            if let Ok(lines) = read_lines(self.launch_options_file.as_ref().unwrap().as_str()) {
-                // Consumes the iterator, returns an (Optional) String
-                for line in lines {
-                    if let Ok(ip) = line {
-                        let sanitized_line = verify_line(ip);
-                        let mut opts = parse_line(sanitized_line).iter()
-                            .map(|o| verify_opt(o.to_owned())).collect();
-                        out.append(&mut opts)
-                    }
-                }
+        // Section header
+        if line.starts_with('[') {
+            let e = line.rfind("]");
+            if let Some(e) = e {
+                current_section = line[1..e].to_string();
+                continue;
+            } else {
+                panic!("Invalid config line: {}", line);
             }
         }
 
-        if let Some(mem_per) = self.max_mem_percent {
-            let has_xmx = out.iter().any(|s| s.starts_with("-Xmx"));
-            if !has_xmx {
-                out.push(format!("-Xmx{}m", (get_max_heap(mem_per)) / 1000))
-            }
-        }
+        // Key=value
+        if let Some(idx) = line.find('=') {
+            let key = line[..idx].trim().to_string();
+            let val = line[idx+1..].trim().to_string();
 
-        return out;
-    }
-
-    /// Make sure the minimum Java requirement is not less than that needed for the main class.
-    pub fn ensure_correct_java(&mut self) {
-        if self.check_main_class {
-            let new_min = get_java_version_of_main(self);
-            if let Some(new_min) = new_min {
-                if let Some(min_java) = self.min_java {
-                    if new_min as i64 > min_java {
-                        self.min_java = Some(new_min as i64);
-                    }
-                } else {
-                    self.min_java = Some(new_min as i64);
-                }
-            }
+            let section = config
+                .entry(current_section.clone())
+                .or_insert_with(Section::new);
+            section.entry(key).or_default().push(val);
         }
     }
+
+    Ok(config)
 }
 
-/// Convert a line into several strings, splitting on spaces.
-pub fn parse_line(line: String) -> Vec<String> {
-    let out: Vec<String> = vec![];
-    if !line.starts_with("#") {
-        let m = line.split(" ");
-        let a: Vec<String> = m.map(String::from).collect();
-        return a;
-    }
+pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
+    let mut options: Vec<String> = Vec::new();
+    let mut classpath: Vec<String> = Vec::new();
+    let mut runtime: Option<PathBuf> = None;
+    let mut min_java: Option<u16> = None;
+    let mut main_class: Option<String> = None;
 
-    out
-}
-
-/// Verify Java standard options (those beginning with `-X`).<br>
-/// If wrongly formatted, the JVM will fail on startup.
-fn verify_opt(input: String) -> String {
-    /*for opt in STANDARD_OPTS {//todo handle postfix char for size
-        if input.starts_with(opt) {
-            let numeral_part = &input[opt.len()..];
-            if let Some(b) = numeral_part.chars().next().and_then(|c| Some(c.is_numeric())) {
-                if b {
-                    return input;
-                }
-            }
-            println!("Launcher rejected a launch option ({}) due to incorrect format.", input);
-            return "".to_string();
-        }
-    }*/
-    input
-}
-
-/// Handle verification of args with spaces
-fn verify_line(mut line: String) -> String {
-    for opt in MODULE_OPTS {
-        if line.contains((opt.to_string() + " ").as_str()) {
-            println!("Launcher corrected a module option ({})! They must be in the form of opt=val.", opt)
-        }
-        line = line.replace((opt.to_string() + " ").as_str(), (opt.to_string() + "=").as_str());
-    }
-    line
-}
-
-/// Read file as lines
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-    where P: AsRef<Path>, {
-    let file = File::open(filename)?;
     if DEBUG {
-        println!("{:?}", file);
+        println!("{:#?}", cfg);
     }
-    Ok(io::BufReader::new(file).lines())
-}
 
-/// Gets the maximum ram on this system in kb
-fn get_max_heap(mem_per: i64) -> u64 {
-    let mut sys = System::new_all();
-    sys.refresh_all();
-    let max_mem = sys.total_memory();
-    let mut mem_frac: f64 = (mem_per as f64) / 100f64;
-    if mem_frac <= 0.01f64 || mem_frac >= 1f64 {
-        mem_frac = 0.2f64;
+    if let Some(java_sec) = cfg.get("JavaOptions") {
+        if let Some(opts) = java_sec.get("java-options") {
+            options.append(&mut opts.clone());
+        }
     }
-    ((max_mem as f64) * mem_frac) as u64
-}
 
+    if let Some(app_sec) = cfg.get("Application") {
+        if let Some(cp) = app_sec.get("app.classpath") {
+            classpath.append(&mut cp.clone());
+        }
+
+        if let Some(version) = app_sec.get("app.version") {
+            //todo
+        }
+
+        if let Some(main_jar) = app_sec.get("app.mainjar") {
+            assert_eq!(main_jar.len(), 1);
+            match read_manifest(PathBuf::from(main_jar[0].clone())) {
+                Ok(manifest) => {
+                    let main_sec = manifest[&None].clone();
+
+                    if let Some(mc) = main_sec.get("Main-Class") {
+                        main_class = Some(mc.clone());
+                    }
+
+                    if let Some(mc) = main_sec.get("Launcher-Agent-Class") {
+                        //todo
+                    }
+
+                    if let Some(cp) = main_sec.get("Class-Path") {
+                        cp.split(" ").for_each(|s| classpath.push(s.to_string()));
+                    }
+
+                    if let Some(ex) = main_sec.get("Add-Exports") {
+                        ex.split(' ').for_each(|s| {
+                            options.push("--add-exports".to_string());
+                            options.push(format!("{}=ALL-UNNAMED", s));
+                        })
+                    }
+
+                    if let Some(ex) = main_sec.get("Add-Opens") {
+                        ex.split(' ').for_each(|s| {
+                            options.push("--add-opens".to_string());
+                            options.push(format!("{}=ALL-UNNAMED", s));
+                        })
+                    }
+
+                    if let Some(ex) = main_sec.get("Enable-Native-Access") {
+                        // This is the only valid value when entered into the manifest
+                        if ex == "ALL-UNNAMED" {
+                            options.push(format!("--enable-native-access={}", ex));
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("{}", e);
+                }
+            }
+
+            classpath.push(main_jar[0].clone());
+        }
+
+        if let Some(mc) = app_sec.get("app.mainclass") {
+            assert_eq!(mc.len(), 1);
+            main_class = Some(mc[0].clone());
+        }
+
+        if let Some(main_module) = app_sec.get("app.mainmodule") {
+            options.push("-m".to_string());
+            options.append(&mut main_module.clone());
+        }
+
+        if let Some(module_path) = app_sec.get("app.modulepath") {
+            options.push("--module-path".to_string());
+            options.push(module_path.join(SEPARATOR));
+        }
+
+        if let Some(rt) = app_sec.get("app.runtime") {
+            assert_eq!(rt.len(), 1);
+            runtime = Some(PathBuf::from(rt[0].clone()));
+        } else {
+            runtime = Some(get_default_runtime_path());
+        }
+
+        if let Some(splash) = app_sec.get("app.splash") {
+            /*options.push("-splash".to_string());
+            options.append(&mut splash.clone());*/
+            //NO-OP JNI does not support
+            //todo how is this implemented?
+            //https://docs.oracle.com/javase/tutorial/uiswing/misc/splashscreen.html#:~:text=how%20to%20use%20the%20command-line%20argument%20to%20display%20a%20splash%20screen
+        }
+
+        if let Some(memory) = app_sec.get("app.memory") {
+            //todo doesn't seem to be handled by jpackage
+        }
+    }
+
+    //todo addArgument(_T("-Djpackage.app-path=") + SysInfo::getProcessModulePath());
+    //todo read app arguments from config file
+    //todo add -XstartOnFirstThread on macos
+
+    if classpath.len() > 0 {
+        options.push(format!("-Djava.class.path={}", classpath.join(SEPARATOR)));
+    }
+
+    return LaunchConfig {
+        main_class: main_class.unwrap(),
+        runtime,
+        min_java: None,
+        java_opts: options.clone(),
+        classpath,
+    }
+}

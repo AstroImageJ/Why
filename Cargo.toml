@@ -2,30 +2,24 @@
 name = "JavaLauncher"
 version = "2.0.0"
 authors = ["Kevin Eastridge"]
-edition = "2021"
+edition = "2024"
 license = "LGPL-3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # See https://github.com/jni-rs/jni-rs/pull/293 linking to path only is silly
+#todo update this to mainline?
 jni = { git = "https://github.com/AstroImageJ/jni-rs", branch = "dyn-load-jvm", features = ["invocation", "invocation-dyn"] }
-walkdir = "2"#todo replace w/ https://rust-lang-nursery.github.io/rust-cookbook/file/dir.html ?
-config = "0.12.0"
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["winuser"] }
-dirs = "4.0.0"
-sysinfo = "0.23.5"
-zip = { version = "0.6"}
-libloading = "0.7"
-dunce = "1.0.2"
-config = "0.15.12"
-[target.'cfg(target_os = "windows")'.dependencies]
+walkdir = "2.5.0"#todo replace w/ https://rust-lang-nursery.github.io/rust-cookbook/file/dir.html ?
 dirs = "6.0.0"
-sysinfo = "0.35.2"
-zip = "4.2.0"
+sysinfo = "0.36.1"
+zip = "4.3.0"
 libloading = "0.8.8"
 dunce = "1.0.5"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = {version = "0.60.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader"]}
 
 # From https://github.com/johnthagen/min-sized-rust
 [profile.release]
