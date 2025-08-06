@@ -1,14 +1,13 @@
+use crate::file_handler::{get_app_dir_path, get_app_image_root, get_default_runtime_path, get_java_version_of_main};
+use crate::manifest_handler::read_manifest;
+use crate::DEBUG;
+use std::path::PathBuf;
 use std::{
     collections::HashMap,
     fs::File,
     io::{self, BufRead, BufReader},
     path::Path,
 };
-use std::path::PathBuf;
-use zip::ZipArchive;
-use crate::{get_java_version_of_main, DEBUG};
-use crate::file_handler::{get_app_dir_path, get_app_image_root, get_default_runtime_path};
-use crate::manifest_handler::read_manifest;
 
 #[cfg(target_os = "windows")]
 const SEPARATOR: &str = ";";
@@ -21,11 +20,6 @@ pub type Section = HashMap<String, Vec<String>>;
 
 /// The full config: section name → Section.
 pub type JPackageLaunchConfig = HashMap<String, Section>;
-
-//todo struct of LauncherConfig that specifies main class, min java (parsed from class file), etc
-//todo handle jre path and jre discovery
-//read from manifest for building rest of the entries
-//read classpath from manifest
 
 #[derive(Debug)]
 pub struct LaunchConfig {
@@ -204,9 +198,9 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
     }
 
     return LaunchConfig {
-        main_class: main_class.unwrap(),
+        main_class: main_class.clone().unwrap(),
         runtime,
-        min_java: None,
+        min_java: get_java_version_of_main(&main_class, &classpath),
         java_opts: options.clone(),
         classpath,
     }

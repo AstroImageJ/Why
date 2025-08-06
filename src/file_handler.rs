@@ -1,26 +1,47 @@
-use crate::{LaunchOpts, JPackageLaunchConfig};
+use crate::LaunchOpts;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use std::env;
 use std::fs::File;
 use std::io::Read;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 use zip::ZipArchive;
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
-const JVM_LOC_QUERIES: &'static [&str] = &[//todo expand for linux/mac
+const JVM_LOC_QUERIES: &'static [&str] = &[
     "$USER$/.gradle/jdks",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/Java",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/AdoptOpenJDK",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/JavaSoft/Java Runtime Environment",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/JavaSoft/Java Development Kit",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/JavaSoft/JRE",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/JavaSoft/JDK",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/Eclipse Foundation/JDK",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/Eclipse Adoptium/JDK",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/Eclipse Adoptium/JRE",
+    #[cfg(target_os = "windows")]
     "C:/Program Files/Azul Systems/Zulu",
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    "/usr/lib/jvm",
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    "/usr/java",
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    "/usr/local/java",
+    #[cfg(target_os = "macos")]
+    "/Library/Java/JavaVirtualMachines",
+    #[cfg(target_os = "macos")]
+    "/System/Library/Java/JavaVirtualMachines",
 ];
 
 #[cfg(target_os = "windows")]
@@ -35,43 +56,44 @@ const DYN_JAVA_LIB: &str = "libjvm.so";
 
 /// Try and find the main class from the given classpath (without resolving it)
 /// and return its required Java version.
-pub fn get_java_version_of_main(launch_cfg: &JPackageLaunchConfig) -> Option<u16> {
-    None
-    //todo handle
-    /*// Go over the classpath
-    return if let Some(classpath) = &launch_cfg.classpath {
-        let jars: Vec<&str> = classpath.split(";").collect();
-        for jar_str in jars {
-            // Open the jar
+pub fn get_java_version_of_main(main_class: &Option<String>, classpath: &Vec<String>) -> Option<u16> {
+    if let Some(main_class) = main_class {
+        // Convert main class to path format
+        let class_path = main_class.replace(".", "/") + ".class";
+
+        // Search through classpath entries
+        for jar_str in classpath {
             let jar_path = Path::new(jar_str);
 
-            if let Ok(jar) = File::open(jar_path) {
-                if jar_path.is_dir() {
-                    if let Ok(mut zip_jar) = ZipArchive::new(jar) {
-                        // Find main class
-                        if let Ok(class) = zip_jar.by_name((launch_cfg.main_class
-                            .as_ref().unwrap().to_string()
-                            .replace(".", "/") + ".class").as_str()) {
-                            // Found main class, get the version
-                            return read_class_version_to_java(class)
+            if !jar_path.exists() {
+                continue;
+            }
+
+            if jar_path.is_dir() {
+                // Search in directory
+                if let Some(class_file_path) = find_file_with_path(jar_path, &class_path) {
+                    if let Ok(class_file) = File::open(class_file_path) {
+                        if let Some(version) = read_class_version_to_java(class_file) {
+                            return Some(version);
                         }
                     }
-                } else {
-                    if let Some(class) = find_file_with_path(jar_path, (launch_cfg.main_class
-                        .as_ref().unwrap().to_string()
-                        .replace(".", "/") + ".class").as_str()) {
-                        if let Ok(class_file) = File::open(class) {
-                            // Found main class, get the version
-                            return read_class_version_to_java(class_file)
+                }
+            } else {
+                // Try to open as JAR
+                if let Ok(jar) = File::open(jar_path) {
+                    if let Ok(mut zip_jar) = ZipArchive::new(jar) {
+                        if let Ok(class_file) = zip_jar.by_name(&class_path) {
+                            if let Some(version) = read_class_version_to_java(class_file) {
+                                return Some(version);
+                            }
                         }
                     }
                 }
             }
         }
-        None
-    } else {
-        None
-    }*/
+    }
+    
+    None
 }
 
 /// Get all valid paths to [`DYN_JAVA_LIB`],
@@ -86,7 +108,6 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
 
     match &launch_opts.config.runtime {
         // Search current directory
-        //todo this needs changes
         None => {
             jvm_paths.push(Box::new(|opts: &LaunchOpts| {
                 let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
@@ -130,9 +151,33 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
         }
     }
 
-    //todo handle
     // Check system Java install
-    /*if launch_opts.config.allows_system_java && !jvm_paths.len() > 4 {
+    if jvm_paths.len() < 4 {
+        jvm_paths.push(Box::new(|opts: &LaunchOpts| {
+            let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
+            
+            // Check JAVA_HOME environment variable
+            if let Ok(path) = env::var("JAVA_HOME") {
+                if !path.is_empty() {
+                    let pb = PathBuf::from(&path);
+                    // Look for the JVM library
+                    if let Some(valid_path) = valid_path(find_file(&path, DYN_JAVA_LIB)) {
+                        if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
+                            if compatible {
+                                if let Ok(resolved_path) = dunce::canonicalize(&valid_path) {
+                                    return Some(resolved_path);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            None
+        }));
+    }
+
+    // Check JAVA_HOME
+    if jvm_paths.len() < 4 {
         jvm_paths.push(Box::new(|opts: &LaunchOpts| {
             match &env::var("JAVA_HOME") {
                 Ok(path) if !path.is_empty() => {
@@ -155,26 +200,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
     }
 
     // Search fallback locations
-    if launch_opts.config.allows_java_location_lookup && !jvm_paths.len() > 4 {
-        // Search current directory if we don't have a path
-        jvm_paths.push(Box::new(|opts: &LaunchOpts| {
-            if let Ok(c_dir) = env::current_dir() {
-                let p = valid_path(find_file(c_dir.to_str().unwrap_or(""), DYN_JAVA_LIB));
-                if let Some(valid_path) = p {
-                    let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
-                    if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
-                        if compatible {
-                            use dunce::canonicalize;
-                            if let Ok(resolved_path) = canonicalize(&*valid_path) {
-                                return Some(resolved_path);
-                            }
-                        }
-                    }
-                }
-            }
-            return None;
-        }));
-
+    if jvm_paths.len() < 4 {
         // Search common install locations
         for loc in JVM_LOC_QUERIES.iter() {
             jvm_paths.push(Box::new(|opts: &LaunchOpts| {
@@ -195,7 +221,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
 
             if jvm_paths.len() > 3 { break }
         }
-    }*/
+    }
 
     jvm_paths
 }
@@ -205,9 +231,39 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
 /// returns `Some(found_ver >= req_ver)` or `None` if the `release` could not be found,
 /// or another error occurs.
 fn compatible_java_version(jvm_path: &PathBuf, req_ver: i32) -> Option<bool> {
+    // Get the parent directory of jvm.dll/libjvm.so
+    let mut parent = jvm_path.parent()?;
+    // Look for release file in parent or grandparent directory
+    let mut release_path = parent.join("release");
 
+    let mut c = 0;
+    while !release_path.exists() && c < 4 {
+        parent = parent.parent()?;
+        release_path = parent.join("release");
+        c += 1;
+    }
 
-    return None;
+    // Try to read the release file
+    if let Ok(file) = File::open(release_path) {
+        let reader = BufReader::new(file);
+        for line in reader.lines().filter_map(|l| l.ok()) {
+            if line.starts_with("JAVA_VERSION=") {
+                // Extract version number
+                if let Some(ver_str) = line.split('=').nth(1) {
+                    // Remove quotes if present
+                    let ver_str = ver_str.trim_matches('"');
+                    // Get first number before dot
+                    if let Some(ver) = ver_str.split('.').next() {
+                        if let Ok(found_ver) = ver.parse::<i32>() {
+                            return Some(found_ver >= req_ver);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 /// Replace tokens with their real values
@@ -321,8 +377,7 @@ pub fn get_default_runtime_path() -> PathBuf {
 #[cfg(target_os = "windows")]
 pub fn get_app_image_root() -> PathBuf {
     std::env::current_exe().unwrap()
-        //.parent().unwrap()
-        .parent().unwrap().to_owned()
+        .parent().unwrap().to_owned() // meh-app
 }
 
 /// The path to the `app` folder.
@@ -339,8 +394,8 @@ pub fn get_default_runtime_path() -> PathBuf {
 #[cfg(target_os = "linux")]
 pub fn get_app_image_root() -> PathBuf {
     std::env::current_exe().unwrap()
-        .parent().unwrap()
-        .parent().unwrap().to_owned()
+        .parent().unwrap() // bin
+        .parent().unwrap().to_owned() //meh-app
 }
 
 /// The path to the `app` folder.
@@ -357,8 +412,7 @@ pub fn get_default_runtime_path() -> PathBuf {
 #[cfg(target_os = "macos")]
 pub fn get_app_image_root() -> PathBuf {
     std::env::current_exe().unwrap()
-        .parent().unwrap()
-        .parent().unwrap()
-        .parent().unwrap()
-        .parent().unwrap().to_owned()
+        .parent().unwrap() // MacOs
+        .parent().unwrap() // Contents
+        .parent().unwrap().to_owned() // meh.app
 }
