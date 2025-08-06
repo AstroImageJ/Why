@@ -56,7 +56,10 @@ const DYN_JAVA_LIB: &str = "libjvm.so";
 
 /// Try and find the main class from the given classpath (without resolving it)
 /// and return its required Java version.
-pub fn get_java_version_of_main(main_class: &Option<String>, classpath: &Vec<String>) -> Option<u16> {
+pub fn get_java_version_of_main(
+    main_class: &Option<String>,
+    classpath: &Vec<String>,
+) -> Option<u16> {
     if let Some(main_class) = main_class {
         // Convert main class to path format
         let class_path = main_class.replace(".", "/") + ".class";
@@ -92,7 +95,7 @@ pub fn get_java_version_of_main(main_class: &Option<String>, classpath: &Vec<Str
             }
         }
     }
-    
+
     None
 }
 
@@ -103,7 +106,9 @@ pub fn get_java_version_of_main(main_class: &Option<String>, classpath: &Vec<Str
 /// If [`Config::allows_java_location_lookup`] is `true`,
 /// will search [`JVM_LOC_QUERIES`] for a valid path.<br>
 /// Also checks Java version for compatibility, find at most 3 JVMs to attempt.
-pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> {
+pub fn get_jvm_paths(
+    launch_opts: &LaunchOpts,
+) -> Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> {
     let mut jvm_paths: Vec<Box<dyn FnOnce(&LaunchOpts) -> Option<PathBuf>>> = Vec::new();
 
     match &launch_opts.config.runtime {
@@ -155,7 +160,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
     if jvm_paths.len() < 4 {
         jvm_paths.push(Box::new(|opts: &LaunchOpts| {
             let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
-            
+
             // Check JAVA_HOME environment variable
             if let Ok(path) = env::var("JAVA_HOME") {
                 if !path.is_empty() {
@@ -192,8 +197,7 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                         }
                     }
                 }
-                _ => {
-                }
+                _ => {}
             }
             return None;
         }));
@@ -219,7 +223,9 @@ pub fn get_jvm_paths(launch_opts: &LaunchOpts) -> Vec<Box<dyn FnOnce(&LaunchOpts
                 return None;
             }));
 
-            if jvm_paths.len() > 3 { break }
+            if jvm_paths.len() > 3 {
+                break;
+            }
         }
     }
 
@@ -276,9 +282,13 @@ fn process_path(path: &str) -> String {
 /// Checks if the path points to an existing file
 fn valid_path(path: Option<PathBuf>) -> Option<PathBuf> {
     match path {
-        None => { None }
+        None => None,
         Some(p) => {
-            if p.exists() { Some(p) } else { None }
+            if p.exists() {
+                Some(p)
+            } else {
+                None
+            }
         }
     }
 }
@@ -286,15 +296,13 @@ fn valid_path(path: Option<PathBuf>) -> Option<PathBuf> {
 /// Locates a file in a given path at max depth 5
 /// Skips hidden files
 fn find_file_with_path<P: AsRef<Path>>(root: P, file: &str) -> Option<PathBuf> {
-    return find_file(root.as_ref().to_str()?, file)
+    return find_file(root.as_ref().to_str()?, file);
 }
 
 /// Locates a file in a given path at max depth 5
 /// Skips hidden files
 fn find_file(root: &str, file: &str) -> Option<PathBuf> {
-    let walker = WalkDir::new(root)
-        .max_depth(5)
-        .into_iter();
+    let walker = WalkDir::new(root).max_depth(5).into_iter();
     let mut path = Path::new(root).to_path_buf();
 
     if path.ends_with(file) {
@@ -321,7 +329,8 @@ fn find_file(root: &str, file: &str) -> Option<PathBuf> {
 
 /// Used to skip hidden files
 fn is_hidden(entry: &DirEntry) -> bool {
-    entry.file_name()
+    entry
+        .file_name()
         .to_str()
         .map(|s| s.starts_with("."))
         .unwrap_or(false)
@@ -346,10 +355,8 @@ fn read_class_version_to_java<R: Read>(mut reader: R) -> Option<u16> {
 
     // Is Java class?
     if magic_number == 0xCAFEBABE {
-        /*let minor_version =
-            u16::from_be_bytes((buffer[4..6]).try_into().ok().unwrap_or_default());*/
-        let major_version =
-            u16::from_be_bytes((buffer[6..8]).try_into().ok().unwrap_or_default());
+        /*let minor_version = u16::from_be_bytes((buffer[4..6]).try_into().ok().unwrap_or_default());*/
+        let major_version = u16::from_be_bytes((buffer[6..8]).try_into().ok().unwrap_or_default());
 
         // If smaller than 45, it likely isn't a Java class
         if major_version >= 45 {
@@ -376,8 +383,11 @@ pub fn get_default_runtime_path() -> PathBuf {
 
 #[cfg(target_os = "windows")]
 pub fn get_app_image_root() -> PathBuf {
-    std::env::current_exe().unwrap()
-        .parent().unwrap().to_owned() // meh-app
+    std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_owned() // meh-app
 }
 
 /// The path to the `app` folder.

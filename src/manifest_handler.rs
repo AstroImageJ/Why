@@ -23,14 +23,9 @@ pub fn read_manifest(jar_path: PathBuf) -> Result<Manifest, String> {
         }
     } else {
         let file = match File::open(jar_path.join("META-INF/MANIFEST.MF")) {
-            Ok(f) => {
-                f
-            }
+            Ok(f) => f,
             Err(e) => {
-                return Err(format!(
-                    "Error reading META-INF/MANIFEST.MF: {}",
-                    e
-                ));
+                return Err(format!("Error reading META-INF/MANIFEST.MF: {}", e));
             }
         };
 

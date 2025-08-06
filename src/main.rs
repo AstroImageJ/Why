@@ -1,15 +1,15 @@
-use std::{env, thread};
-use std::path::{Path, PathBuf};
 use crate::display_handler::message;
-use crate::file_handler::{get_app_dir_path, get_java_version_of_main};
+use crate::file_handler::get_app_dir_path;
 use crate::java_launcher::{create_and_run_jvm, LaunchOpts};
-use crate::launch_config::{process_config, parse_config, JPackageLaunchConfig};
+use crate::launch_config::{parse_config, process_config};
 use crate::manifest_handler::read_manifest;
+use std::path::PathBuf;
+use std::env;
 
 mod display_handler;
+mod file_handler;
 mod java_launcher;
 mod launch_config;
-mod file_handler;
 mod manifest_handler;
 
 pub const DEBUG: bool = true;
@@ -40,15 +40,21 @@ fn launch() {
     let mf = read_manifest(PathBuf::from("ij"));
     println!("{:?}", mf);
 
-    let cfgPath = get_app_dir_path().join(env::current_exe().unwrap().with_extension("cfg").file_name().unwrap());
+    let cfgPath = get_app_dir_path().join(
+        env::current_exe()
+            .unwrap()
+            .with_extension("cfg")
+            .file_name()
+            .unwrap(),
+    );
     println!("{:?}", cfgPath);
     let _ = env::set_current_dir(get_app_dir_path());
 
     // Build launch opts
     let mut m = LaunchOpts {
-        config: process_config(&parse_config(cfgPath).unwrap()),//todo handle missing file error
-        jvm_opts: vec![],                    //this can be relative
-        program_opts: env::args().collect(), // Forward launch args to the app
+        config: process_config(&parse_config(cfgPath).unwrap()), //todo handle missing file error
+        jvm_opts: vec![],                                        //this can be relative
+        program_opts: env::args().collect(),                     // Forward launch args to the app
     };
 
     // The first element is the launcher path, no need to pass it on

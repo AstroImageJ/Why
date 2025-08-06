@@ -1,4 +1,6 @@
-use crate::file_handler::{get_app_dir_path, get_app_image_root, get_default_runtime_path, get_java_version_of_main};
+use crate::file_handler::{
+    get_app_dir_path, get_app_image_root, get_default_runtime_path, get_java_version_of_main,
+};
 use crate::manifest_handler::read_manifest;
 use crate::DEBUG;
 use std::path::PathBuf;
@@ -69,7 +71,7 @@ pub fn parse_config<P: AsRef<Path>>(path: P) -> io::Result<JPackageLaunchConfig>
         // Key=value
         if let Some(idx) = line.find('=') {
             let key = line[..idx].trim().to_string();
-            let val = line[idx+1..].trim().to_string();
+            let val = line[idx + 1..].trim().to_string();
 
             let section = config
                 .entry(current_section.clone())
@@ -203,5 +205,5 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         min_java: get_java_version_of_main(&main_class, &classpath),
         java_opts: options.clone(),
         classpath,
-    }
+    };
 }
