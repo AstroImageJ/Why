@@ -5,8 +5,8 @@ use core::option::Option::{None, Some};
 use dunce::canonicalize;
 use std::env;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::io::Read;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 
@@ -65,12 +65,11 @@ pub fn get_java_version_of_main(
         // Convert main class to path format
         let class_path = main_class.replace(".", "/") + ".class";
 
-        // Search through classpath entries
-        for jar_str in classpath {
+        return classpath.iter().find_map(|jar_str| {
             let jar_path = Path::new(jar_str);
 
             if !jar_path.exists() {
-                continue;
+                return None;
             }
 
             if jar_path.is_dir() {
@@ -82,6 +81,7 @@ pub fn get_java_version_of_main(
                         }
                     }
                 }
+                return None;
             } else {
                 // Try to open as JAR
                 if let Some(mut zip_jar) = open_zip(jar_path) {
@@ -91,8 +91,9 @@ pub fn get_java_version_of_main(
                         }
                     }
                 }
+                return None;
             }
-        }
+        });
     }
 
     None

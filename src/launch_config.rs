@@ -1,9 +1,9 @@
-use crate::DEBUG;
 use crate::file_handler::{
     get_app_dir_path, get_app_image_root, get_default_runtime_path, get_exec_path,
     get_java_version_of_main,
 };
 use crate::manifest_handler::read_manifest;
+use crate::DEBUG;
 use std::path::PathBuf;
 use std::{
     collections::HashMap,
@@ -92,6 +92,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
     let mut program_opts: Vec<String> = Vec::new();
     let mut runtime: Option<PathBuf> = None;
     let mut main_class: Option<String> = None;
+    let mut lookup_path: Vec<String> = Vec::new();
 
     if DEBUG {
         println!("{:#?}", cfg);
@@ -156,6 +157,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
                 }
             }
 
+            lookup_path.push(main_jar[0].clone());
             classpath.push(main_jar[0].clone());
         }
 
@@ -212,10 +214,16 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         options.push(format!("-Djava.class.path={}", classpath.join(SEPARATOR)));
     }
 
+    // If the main jar is specified, use that as the lookup path to avoid searching the entire
+    // classpath, otherwise use the entire classpath.
+    if lookup_path.is_empty() {
+        lookup_path = classpath.clone();
+    }
+
     return LaunchConfig {
         main_class: main_class.clone().unwrap(),
         runtime,
-        min_java: get_java_version_of_main(&main_class, &classpath),
+        min_java: get_java_version_of_main(&main_class, &lookup_path),
         java_opts: options.clone(),
         classpath,
         program_opts,

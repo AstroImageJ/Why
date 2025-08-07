@@ -1,13 +1,12 @@
+use crate::file_handler::get_jvm_paths;
+use jni::objects::{JObject, JString};
+use jni::sys::{jint, jsize, JNI_OK};
+use jni::{sys, InitArgs, InitArgsBuilder, JNIVersion, JavaVM, JvmError};
 use std::iter::once;
 use std::path::PathBuf;
 
-use crate::file_handler::get_jvm_paths;
-use jni::objects::{JObject, JString};
-use jni::sys::{JNI_OK, jint, jsize};
-use jni::{InitArgs, InitArgsBuilder, JNIVersion, JavaVM, JvmError, sys};
-
 use crate::launch_config::LaunchConfig;
-use crate::{DEBUG, message};
+use crate::{message, DEBUG};
 
 /// The launcher options, such as JVM args and where the JVM is located.
 #[derive(Debug)]
@@ -199,7 +198,7 @@ fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
+fn set_dynamic_library_lookup_loc(_jvm_path: &PathBuf) {
     // NO-OP at this time
 }
 

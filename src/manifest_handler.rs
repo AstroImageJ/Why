@@ -13,11 +13,11 @@ pub type Manifest = HashMap<Option<String>, Section>;
 /// Reads a JAR manifest (either from a compressed .jar or an exploded directory)
 /// and parses it into a Manifest, mapping section names to key-value pairs.
 pub fn read_manifest(jar_path: &PathBuf) -> Result<Manifest, String> {
-    if !jar_path.is_dir() {
+    if jar_path.is_file() {
         if let Some(mut zip_jar) = open_zip(jar_path) {
             if let Ok(f) = zip_jar.by_name("META-INF/MANIFEST.MF") {
                 return parse_manifest(BufReader::new(f));
-            } else { 
+            } else {
                 return Err("Manifest not found".to_string());
             }
         }
