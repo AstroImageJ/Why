@@ -30,6 +30,7 @@ pub struct LaunchConfig {
     pub runtime: Option<PathBuf>,
     pub min_java: Option<u16>,
     pub java_opts: Vec<String>,
+    #[allow(dead_code)]
     pub classpath: Vec<String>,
     pub program_opts: Vec<String>,
 }
@@ -90,7 +91,6 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
     let mut classpath: Vec<String> = Vec::new();
     let mut program_opts: Vec<String> = Vec::new();
     let mut runtime: Option<PathBuf> = None;
-    let mut min_java: Option<u16> = None;
     let mut main_class: Option<String> = None;
 
     if DEBUG {
@@ -108,7 +108,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
             classpath.append(&mut cp.clone());
         }
 
-        if let Some(version) = app_sec.get("app.version") {
+        if let Some(_version) = app_sec.get("app.version") {
             // Doesn't seem to be handled by jpackage despite being mentioned in code
         }
 
@@ -122,7 +122,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
                         main_class = Some(mc.clone());
                     }
 
-                    if let Some(mc) = main_sec.get("Launcher-Agent-Class") {
+                    if let Some(_mc) = main_sec.get("Launcher-Agent-Class") {
                         //todo
                     }
 
@@ -181,7 +181,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
             runtime = Some(get_default_runtime_path());
         }
 
-        if let Some(splash) = app_sec.get("app.splash") {
+        if let Some(_splash) = app_sec.get("app.splash") {
             /*options.push("-splash".to_string());
             options.append(&mut splash.clone());*/
             //NO-OP JNI does not support
@@ -189,7 +189,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
             //https://docs.oracle.com/javase/tutorial/uiswing/misc/splashscreen.html#:~:text=how%20to%20use%20the%20command-line%20argument%20to%20display%20a%20splash%20screen
         }
 
-        if let Some(memory) = app_sec.get("app.memory") {
+        if let Some(_memory) = app_sec.get("app.memory") {
             // Doesn't seem to be handled by jpackage despite being mentioned in code
             //https://github.com/search?q=repo%3Aopenjdk%2Fjdk+memory+path%3Ajdk.jpackage&type=code
         }
