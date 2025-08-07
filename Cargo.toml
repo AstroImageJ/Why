@@ -8,9 +8,7 @@ license = "LGPL-3.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# See https://github.com/jni-rs/jni-rs/pull/293 linking to path only is silly
-#todo update this to mainline?
-jni = { git = "https://github.com/AstroImageJ/jni-rs", branch = "dyn-load-jvm", features = ["invocation", "invocation-dyn"] }
+jni = { version = "0.21.1", features = ["invocation"] }
 walkdir = "2.5.0"#todo replace w/ https://rust-lang-nursery.github.io/rust-cookbook/file/dir.html ?
 dirs = "6.0.0"
 zip = "4.3.0"

@@ -2,8 +2,8 @@ use std::iter::once;
 use std::path::PathBuf;
 
 use crate::file_handler::get_jvm_paths;
-use jni::objects::{JObject, JValue};
-use jni::sys::{jint, jsize, JNIInvokeInterface_, JNI_OK};
+use jni::objects::{JObject, JString};
+use jni::sys::{jint, jsize, JNI_OK};
 use jni::{sys, InitArgs, InitArgsBuilder, JNIVersion, JavaVM, JvmError};
 
 use crate::launch_config::LaunchConfig;
@@ -29,15 +29,13 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
 
         // Starting the app
         match maybe_env {
-            Ok(env) => {
+            Ok(mut env) => {
                 // Convert program args for forwarding
-                let opts: Vec<JValue> = launch_opts
+                let opts: Vec<JString> = launch_opts
                     .program_opts
                     .iter()
                     .map(|s| env.new_string(s)) // Convert to JString (maybe)
-                    .filter(|m| m.is_ok())
-                    .map(|m| m.unwrap()) // Remove invalid JStrings
-                    .map(|s| JValue::Object(*s))
+                    .filter_map(Result::ok)
                     .collect(); // Convert to something usable
 
                 if DEBUG {
@@ -52,12 +50,13 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                 );
                 let args = arg_array.unwrap();
                 let mut i = 0;
-                for o in opts {
-                    let _ = env.set_object_array_element(args, i, o.l().unwrap());
+                for s in opts {
+                    let o = JObject::from(s);
+                    let _ = env.set_object_array_element(&args, i, &o);
                     i = i + 1;
 
                     if DEBUG {
-                        println!("Unwrap: {:?}", o.l().unwrap());
+                        println!("Unwrap: {:?}", o);
                     }
                 }
 
@@ -74,7 +73,7 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
                     main_class,
                     "main",
                     "([Ljava/lang/String;)V",
-                    &[JValue::from(JObject::from(args))],
+                    &[(&args).into()],
                 );
 
                 // Launch failed
@@ -208,11 +207,7 @@ fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
 /// See <https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#unloading-the-vm>
 fn close_jvm(jvm: JavaVM) {
     unsafe {
-        let f: Option<unsafe extern "system" fn(*mut *const JNIInvokeInterface_) -> jint> =
-            (*(*jvm.get_java_vm_pointer())).DestroyJavaVM;
-        if let Some(func) = f {
-            func(jvm.get_java_vm_pointer());
-        }
+        jvm.destroy().unwrap();
     }
 }
 
