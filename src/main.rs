@@ -1,6 +1,6 @@
 use crate::display_handler::message;
 use crate::file_handler::get_app_dir_path;
-use crate::java_launcher::{create_and_run_jvm, LaunchOpts};
+use crate::java_launcher::{LaunchOpts, create_and_run_jvm};
 use crate::launch_config::{parse_config, process_config};
 use std::env;
 
@@ -53,10 +53,14 @@ fn launch() {
     }
 
     // Forward jvm options to primary config struct
-    launch_options.jvm_opts.append(&mut launch_options.config.java_opts);
+    launch_options
+        .jvm_opts
+        .append(&mut launch_options.config.java_opts);
 
     // Forward embedded program options to primary config struct
-    launch_options.program_opts.append(&mut launch_options.config.program_opts);
+    launch_options
+        .program_opts
+        .append(&mut launch_options.config.program_opts);
 
     if DEBUG {
         println!("{:?}", launch_options);

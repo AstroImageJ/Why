@@ -1,6 +1,7 @@
 use crate::LaunchOpts;
 use core::option::Option;
 use core::option::Option::{None, Some};
+use dunce::canonicalize;
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -8,7 +9,6 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 use zip::ZipArchive;
-use dunce::canonicalize;
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
 const JVM_LOC_QUERIES: &'static [&str] = &[

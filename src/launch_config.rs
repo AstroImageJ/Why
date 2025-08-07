@@ -1,6 +1,9 @@
-use crate::file_handler::{get_app_dir_path, get_app_image_root, get_default_runtime_path, get_exec_path, get_java_version_of_main};
-use crate::manifest_handler::read_manifest;
 use crate::DEBUG;
+use crate::file_handler::{
+    get_app_dir_path, get_app_image_root, get_default_runtime_path, get_exec_path,
+    get_java_version_of_main,
+};
+use crate::manifest_handler::read_manifest;
 use std::path::PathBuf;
 use std::{
     collections::HashMap,
