@@ -426,3 +426,9 @@ pub fn get_app_image_root() -> PathBuf {
         .parent().unwrap() // Contents
         .parent().unwrap().to_owned() // meh.app
 }
+
+pub fn get_exec_path() -> String {
+    dunce::canonicalize(env::current_exe().unwrap())
+        .unwrap().to_str()
+        .unwrap_or("").to_string()
+}

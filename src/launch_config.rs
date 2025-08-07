@@ -1,6 +1,4 @@
-use crate::file_handler::{
-    get_app_dir_path, get_app_image_root, get_default_runtime_path, get_java_version_of_main,
-};
+use crate::file_handler::{get_app_dir_path, get_app_image_root, get_default_runtime_path, get_exec_path, get_java_version_of_main};
 use crate::manifest_handler::read_manifest;
 use crate::DEBUG;
 use std::path::PathBuf;
@@ -30,6 +28,7 @@ pub struct LaunchConfig {
     pub min_java: Option<u16>,
     pub java_opts: Vec<String>,
     pub classpath: Vec<String>,
+    pub program_opts: Vec<String>,
 }
 
 /// Parse an INI‑style file at `path` into a `Config`,
@@ -86,6 +85,7 @@ pub fn parse_config<P: AsRef<Path>>(path: P) -> io::Result<JPackageLaunchConfig>
 pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
     let mut options: Vec<String> = Vec::new();
     let mut classpath: Vec<String> = Vec::new();
+    let mut program_opts: Vec<String> = Vec::new();
     let mut runtime: Option<PathBuf> = None;
     let mut min_java: Option<u16> = None;
     let mut main_class: Option<String> = None;
@@ -106,7 +106,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         }
 
         if let Some(version) = app_sec.get("app.version") {
-            //todo
+            // Doesn't seem to be handled by jpackage despite being mentioned in code
         }
 
         if let Some(main_jar) = app_sec.get("app.mainjar") {
@@ -182,18 +182,26 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
             /*options.push("-splash".to_string());
             options.append(&mut splash.clone());*/
             //NO-OP JNI does not support
-            //todo how is this implemented?
+            //would need to manually invoke the splash screen classes for launch
             //https://docs.oracle.com/javase/tutorial/uiswing/misc/splashscreen.html#:~:text=how%20to%20use%20the%20command-line%20argument%20to%20display%20a%20splash%20screen
         }
 
         if let Some(memory) = app_sec.get("app.memory") {
-            //todo doesn't seem to be handled by jpackage
+            // Doesn't seem to be handled by jpackage despite being mentioned in code
+            //https://github.com/search?q=repo%3Aopenjdk%2Fjdk+memory+path%3Ajdk.jpackage&type=code
         }
     }
 
-    //todo addArgument(_T("-Djpackage.app-path=") + SysInfo::getProcessModulePath());
-    //todo read app arguments from config file
-    //todo add -XstartOnFirstThread on macos
+    if let Some(app_options) = cfg.get("ArgOptions") {
+        if let Some(args) = app_options.get("arguments") {
+            program_opts.append(&mut args.clone())
+        }
+    }
+
+    options.push(format!("-Djpackage.app-path={}", get_exec_path()));
+
+    #[cfg(target_os = "macos")]
+    options.push("-XstartOnFirstThread");
 
     if classpath.len() > 0 {
         options.push(format!("-Djava.class.path={}", classpath.join(SEPARATOR)));
@@ -205,5 +213,6 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         min_java: get_java_version_of_main(&main_class, &classpath),
         java_opts: options.clone(),
         classpath,
+        program_opts,
     };
 }

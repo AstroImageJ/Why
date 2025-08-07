@@ -55,6 +55,9 @@ fn launch() {
     // Forward jvm options to primary config struct
     launch_options.jvm_opts.append(&mut launch_options.config.java_opts);
 
+    // Forward embedded program options to primary config struct
+    launch_options.program_opts.append(&mut launch_options.config.program_opts);
+
     if DEBUG {
         println!("{:?}", launch_options);
     }
