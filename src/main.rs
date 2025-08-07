@@ -25,7 +25,7 @@ fn main() {
 
 /// Setup the environment and launch the application
 fn launch() {
-    let cfgPath = get_app_dir_path().join(
+    let cfg_path = get_app_dir_path().join(
         env::current_exe()
             .unwrap()
             .with_extension("cfg")
@@ -36,13 +36,13 @@ fn launch() {
     // Set current directory to app folder
     let _ = env::set_current_dir(get_app_dir_path());
 
-    if !cfgPath.exists() {
-        message(format!("Failed to find configuration file at {:?}", cfgPath).as_str())
+    if !cfg_path.exists() {
+        message(format!("Failed to find configuration file at {:?}", cfg_path).as_str())
     }
 
     // Build launch opts
     let mut launch_options = LaunchOpts {
-        config: process_config(&parse_config(cfgPath).unwrap()),
+        config: process_config(&parse_config(cfg_path).unwrap()),
         jvm_opts: vec![],
         program_opts: env::args().collect(), // Forward launch args to the app
     };
