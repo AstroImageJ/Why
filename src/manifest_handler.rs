@@ -1,8 +1,8 @@
+use crate::zip_handler::open_zip;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
-use zip::ZipArchive;
 
 pub type Section = HashMap<String, String>;
 
@@ -12,13 +12,13 @@ pub type Manifest = HashMap<Option<String>, Section>;
 
 /// Reads a JAR manifest (either from a compressed .jar or an exploded directory)
 /// and parses it into a Manifest, mapping section names to key-value pairs.
-pub fn read_manifest(jar_path: PathBuf) -> Result<Manifest, String> {
+pub fn read_manifest(jar_path: &PathBuf) -> Result<Manifest, String> {
     if !jar_path.is_dir() {
-        if let Ok(jar) = File::open(jar_path) {
-            if let Ok(mut zip_jar) = ZipArchive::new(jar) {
-                if let Ok(f) = zip_jar.by_name("META-INF/MANIFEST.MF") {
-                    return parse_manifest(BufReader::new(f));
-                }
+        if let Some(mut zip_jar) = open_zip(jar_path) {
+            if let Ok(f) = zip_jar.by_name("META-INF/MANIFEST.MF") {
+                return parse_manifest(BufReader::new(f));
+            } else { 
+                return Err("Manifest not found".to_string());
             }
         }
     } else {

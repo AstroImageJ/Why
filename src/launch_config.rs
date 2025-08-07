@@ -114,7 +114,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
 
         if let Some(main_jar) = app_sec.get("app.mainjar") {
             assert_eq!(main_jar.len(), 1);
-            match read_manifest(PathBuf::from(main_jar[0].clone())) {
+            match read_manifest(&PathBuf::from(main_jar[0].clone())) {
                 Ok(manifest) => {
                     let main_sec = manifest[&None].clone();
 

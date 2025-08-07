@@ -1,14 +1,14 @@
+use crate::zip_handler::open_zip;
 use crate::LaunchOpts;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use dunce::canonicalize;
 use std::env;
 use std::fs::File;
-use std::io::Read;
 use std::io::{BufRead, BufReader};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
-use zip::ZipArchive;
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
 const JVM_LOC_QUERIES: &'static [&str] = &[
@@ -84,12 +84,10 @@ pub fn get_java_version_of_main(
                 }
             } else {
                 // Try to open as JAR
-                if let Ok(jar) = File::open(jar_path) {
-                    if let Ok(mut zip_jar) = ZipArchive::new(jar) {
-                        if let Ok(class_file) = zip_jar.by_name(&class_path) {
-                            if let Some(version) = read_class_version_to_java(class_file) {
-                                return Some(version);
-                            }
+                if let Some(mut zip_jar) = open_zip(jar_path) {
+                    if let Ok(class_file) = zip_jar.by_name(&class_path) {
+                        if let Some(version) = read_class_version_to_java(class_file) {
+                            return Some(version);
                         }
                     }
                 }

@@ -9,6 +9,7 @@ mod file_handler;
 mod java_launcher;
 mod launch_config;
 mod manifest_handler;
+mod zip_handler;
 
 pub const DEBUG: bool = false;
 
