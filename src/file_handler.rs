@@ -8,6 +8,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 use zip::ZipArchive;
+use dunce::canonicalize;
 
 /// The fallback locations to look for a Java installation, drawn from common install locations.
 const JVM_LOC_QUERIES: &'static [&str] = &[
@@ -121,7 +122,6 @@ pub fn get_jvm_paths(
                     if let Some(valid_path) = p {
                         if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                             if compatible {
-                                use dunce::canonicalize;
                                 if let Ok(resolved_path) = canonicalize(&*valid_path) {
                                     return Some(resolved_path);
                                 }
@@ -141,7 +141,6 @@ pub fn get_jvm_paths(
                     if let Some(valid_path) = p {
                         if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                             if compatible {
-                                use dunce::canonicalize;
                                 if let Ok(resolved_path) = canonicalize(&*valid_path) {
                                     return Some(resolved_path);
                                 }
@@ -169,7 +168,7 @@ pub fn get_jvm_paths(
                     if let Some(valid_path) = valid_path(find_file(&path, DYN_JAVA_LIB)) {
                         if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                             if compatible {
-                                if let Ok(resolved_path) = dunce::canonicalize(&valid_path) {
+                                if let Ok(resolved_path) = canonicalize(&valid_path) {
                                     return Some(resolved_path);
                                 }
                             }
@@ -190,7 +189,6 @@ pub fn get_jvm_paths(
                     let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
                     if let Some(compatible) = compatible_java_version(&pb, min_java_ver) {
                         if compatible {
-                            use dunce::canonicalize;
                             if let Ok(resolved_path) = canonicalize(&*pb) {
                                 return Some(resolved_path);
                             }
@@ -213,7 +211,6 @@ pub fn get_jvm_paths(
                     let min_java_ver = opts.config.min_java.unwrap_or(0) as i32;
                     if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
                         if compatible {
-                            use dunce::canonicalize;
                             if let Ok(resolved_path) = canonicalize(&*valid_path) {
                                 return Some(resolved_path);
                             }
