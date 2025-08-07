@@ -153,7 +153,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
                     }
                 }
                 Err(e) => {
-                    println!("{}", e);
+                    eprintln!("{}", e);
                 }
             }
 

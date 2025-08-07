@@ -21,14 +21,15 @@ fn print_message(msg: &str) -> Result<i32, Error> {
 
 #[cfg(not(target_os = "windows"))]
 fn print_message(msg: &str) -> Result<(), Error> {
-    println!("{}", msg);
+    eprintln!("{}", msg);
     Ok(())
 }
 
 /// Display a native message dialog.<br>
-/// Eats any errors that occur.
+/// Logs any errors that occur.
 pub fn message(msg: &str) {
-    if let Ok(_) = print_message(msg) {
-        // no-op
+    if let Err(err) = print_message(msg) {
+        eprintln!("Failed to display message due to error: {:?}", err);
+        eprintln!("Message: {}", msg);
     }
 }
