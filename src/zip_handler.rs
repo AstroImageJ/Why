@@ -2,13 +2,13 @@ use crate::DEBUG;
 use memmap2::Mmap;
 use std::fs::File;
 use std::io;
-use std::io::{Cursor, Read, Seek};
+use std::io::{BufReader, Cursor, Read, Seek};
 use std::path::Path;
 use zip::ZipArchive;
 
 /// For some reason reading the zip through WSL is extremely slow,
 /// so we use a memory mapped file as an intermediary.
-/// 
+///
 /// Falls back to reading it normally if mapping fails.
 pub fn open_zip(path: &Path) -> Option<ZipArchive<ZipSource>> {
     match File::open(path) {
@@ -34,7 +34,7 @@ pub fn open_zip(path: &Path) -> Option<ZipArchive<ZipSource>> {
                         println!("Failed to memory map zip: {}", e);
                     }
 
-                    match ZipArchive::new(ZipSource::File(file)) {
+                    match ZipArchive::new(ZipSource::Buffered(BufReader::new(file))) {
                         Ok(zip) => {
                             return Some(zip);
                         }
@@ -61,6 +61,7 @@ pub fn open_zip(path: &Path) -> Option<ZipArchive<ZipSource>> {
 pub enum ZipSource {
     Mapped(Cursor<Mmap>),
     File(File),
+    Buffered(BufReader<File>),
 }
 
 impl Read for ZipSource {
@@ -69,6 +70,7 @@ impl Read for ZipSource {
         match self {
             ZipSource::Mapped(cursor) => cursor.read(buf),
             ZipSource::File(file) => file.read(buf),
+            ZipSource::Buffered(buffered) => buffered.read(buf),
         }
     }
 }
@@ -79,6 +81,7 @@ impl Seek for ZipSource {
         match self {
             ZipSource::Mapped(cursor) => cursor.seek(pos),
             ZipSource::File(file) => file.seek(pos),
+            ZipSource::Buffered(buffered) => buffered.seek(pos),
         }
     }
 }
