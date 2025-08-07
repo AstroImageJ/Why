@@ -163,7 +163,6 @@ pub fn get_jvm_paths(
             // Check JAVA_HOME environment variable
             if let Ok(path) = env::var("JAVA_HOME") {
                 if !path.is_empty() {
-                    let pb = PathBuf::from(&path);
                     // Look for the JVM library
                     if let Some(valid_path) = valid_path(find_file(&path, DYN_JAVA_LIB)) {
                         if let Some(compatible) = compatible_java_version(&valid_path, min_java_ver) {
@@ -368,64 +367,65 @@ fn read_class_version_to_java<R: Read>(mut reader: R) -> Option<u16> {
 }
 
 /// The path to the `app` folder.
-#[cfg(target_os = "windows")]
 pub fn get_app_dir_path() -> PathBuf {
-    get_app_image_root().join("app")
+    #[cfg(target_os = "windows")]
+    {
+        return get_app_image_root().join("app");
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return get_app_image_root().join("lib").join("app");
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return get_app_image_root().join("Contents").join("app");
+    }
 }
 
-#[cfg(target_os = "windows")]
 pub fn get_default_runtime_path() -> PathBuf {
-    get_app_image_root().join("runtime")
+    #[cfg(target_os = "windows")]
+    {
+        return get_app_image_root().join("runtime");
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return get_app_image_root().join("lib").join("runtime");
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return get_app_image_root().join("Contents").join("runtime");
+    }
 }
 
-#[cfg(target_os = "windows")]
 pub fn get_app_image_root() -> PathBuf {
-    std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_owned() // meh-app
-}
+    #[cfg(target_os = "windows")]
+    {
+        return env::current_exe().unwrap()
+            .parent().unwrap().to_owned() // meh-app
+    }
 
-/// The path to the `app` folder.
-#[cfg(target_os = "linux")]
-pub fn get_app_dir_path() -> PathBuf {
-    get_app_image_root().join("lib").join("app")
-}
+    #[cfg(target_os = "linux")]
+    {
+        return env::current_exe().unwrap()
+            .parent().unwrap() // bin
+            .parent().unwrap().to_owned() //meh-app
+    }
 
-#[cfg(target_os = "linux")]
-pub fn get_default_runtime_path() -> PathBuf {
-    get_app_image_root().join("lib").join("runtime")
-}
-
-#[cfg(target_os = "linux")]
-pub fn get_app_image_root() -> PathBuf {
-    std::env::current_exe().unwrap()
-        .parent().unwrap() // bin
-        .parent().unwrap().to_owned() //meh-app
-}
-
-/// The path to the `app` folder.
-#[cfg(target_os = "macos")]
-pub fn get_app_dir_path() -> PathBuf {
-    get_app_image_root().join("Contents").join("app")
-}
-
-#[cfg(target_os = "macos")]
-pub fn get_default_runtime_path() -> PathBuf {
-    get_app_image_root().join("Contents").join("runtime")
-}
-
-#[cfg(target_os = "macos")]
-pub fn get_app_image_root() -> PathBuf {
-    std::env::current_exe().unwrap()
-        .parent().unwrap() // MacOs
-        .parent().unwrap() // Contents
-        .parent().unwrap().to_owned() // meh.app
+    #[cfg(target_os = "macos")]
+    {
+        return env::current_exe().unwrap()
+            .parent().unwrap() // MacOs
+            .parent().unwrap() // Contents
+            .parent().unwrap().to_owned() // meh.app
+    }
 }
 
 pub fn get_exec_path() -> String {
-    dunce::canonicalize(env::current_exe().unwrap())
+    canonicalize(env::current_exe().unwrap())
         .unwrap().to_str()
         .unwrap_or("").to_string()
 }
