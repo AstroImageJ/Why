@@ -1,10 +1,8 @@
-use crate::file_handler::get_jvm_paths;
-use jni::objects::{JObject, JString};
-use jni::sys::{jint, jsize, JNI_OK};
-use jni::{sys, InitArgs, InitArgsBuilder, JNIVersion, JavaVM, JvmError};
+use jni::{InitArgs, InitArgsBuilder, JNIVersion, JavaVM, JvmError};
 use std::iter::once;
 use std::path::PathBuf;
 
+use crate::file_handler::get_jvm_paths;
 use crate::launch_config::LaunchConfig;
 use crate::{message, DEBUG};
 
@@ -24,157 +22,84 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
         // Attach the current thread to call into Java
         // This method returns the guard that will detach the current thread when dropped,
         // also freeing any local references created in it
-        let maybe_env = jvm.attach_current_thread_as_daemon();
-
-        // Starting the app
-        match maybe_env {
+        match jvm.attach_current_thread_as_daemon() {
             Ok(mut env) => {
-                // Convert program args for forwarding
-                let opts: Vec<JString> = launch_opts
-                    .program_opts
-                    .iter()
-                    .map(|s| env.new_string(s)) // Convert to JString (maybe)
-                    .filter_map(Result::ok)
-                    .collect(); // Convert to something usable
-
-                if DEBUG {
-                    println!("{:?}", launch_opts.program_opts);
-                }
-
-                // Make array for main method, passing a slice of jstrings does not work
-                let arg_array = env.new_object_array(
-                    opts.len() as i32,
-                    "java/lang/String",
-                    env.new_string("").unwrap(),
-                );
-                let args = arg_array.unwrap();
-                let mut i = 0;
-                for s in opts {
-                    let o = JObject::from(s);
-                    let _ = env.set_object_array_element(&args, i, &o);
-                    i = i + 1;
-
-                    if DEBUG {
-                        println!("Unwrap: {:?}", o);
-                    }
-                }
-
-                // Ensure correct format of main class
-                let main_class = launch_opts.config.main_class.replace(".", "/");
-
-                if DEBUG {
-                    println!("{:?}", main_class);
-                    println!("{:?}", args);
-                }
-
-                // Call main method
-                let v = env.call_static_method(
-                    main_class,
-                    "main",
-                    "([Ljava/lang/String;)V",
-                    &[(&args).into()],
-                );
-
-                // Launch failed
-                if let Err(e) = v {
-                    println!("{:?}", e);
+                if let Err(e) = call_main_method(&mut env, launch_opts) {
+                    eprintln!("Failed to invoke main method: {:?}", e);
                     message(
-                        "Failed to start the app, the classname was invalid or \
-                    not on the classpath, or the main method could not be found.\n\
-                    Please contact the developers.",
+                        "Failed to start the app. Ensure the classname is valid and available on the classpath.",
                     );
-                    return;
-                }
-
-                // This hangs and waits for all Java threads to close before shutting down
-                // Also keeps the JVM open, without this we immediately shut down
-                if let Ok(j) = env.get_java_vm() {
-                    // This gets around ownership issues
-                    close_jvm(j);
                 }
             }
-            Err(e) => {
-                println!("{:?}", e);
-                message(
-                    "Java successfully started, but failed to attach to it and therefore cannot proceed.\n\
-                Please contact the developers.",
-                )
+            Err(err) => {
+                eprintln!("Failed to attach to JVM: {:?}", err);
+                message("Java started successfully, but attaching failed. Please contact the developers.");
             }
         }
-
-        // Ensure the JVM is closed
-        close_jvm(jvm)
+        close_jvm(jvm);
     } else {
-        // Error messages
-        // String formatting? What's that?
-        let version = launch_opts.config.min_java.unwrap_or(0);
-        let mut inst = "any Java.".to_owned();
-        if version > 0 {
-            let mut x = "Java ".to_owned();
-            x.push_str(version.to_string().as_str());
-            x.push_str(" or newer.");
-            inst = x.clone();
-        }
-        message(
-            &("A missing or older Java installation was found.\n\
-                    Please install "
-                .to_owned()
-                + inst.as_str()),
-        )
+        let msg = match launch_opts.config.min_java {
+            Some(version) => format!(
+                "A minimum of Java {} or newer is required. Please install an appropriate version.",
+                version
+            ),
+            None => "No valid Java installations found. Please install any Java version.".to_string(),
+        };
+        message(&msg);
     }
+}
+
+fn call_main_method(env: &mut jni::JNIEnv, launch_opts: &LaunchOpts) -> Result<(), jni::errors::Error> {
+    let opts = launch_opts
+        .program_opts
+        .iter()
+        .map(|s| env.new_string(s))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let arg_array = env.new_object_array(
+        opts.len() as i32,
+        "java/lang/String",
+        env.new_string("")?,
+    )?;
+
+    for (i, jstring) in opts.into_iter().enumerate() {
+        env.set_object_array_element(&arg_array, i as i32, jstring)?;
+    }
+
+    let main_class = launch_opts.config.main_class.replace('.', "/");
+
+    if DEBUG {
+        println!("{:?}", main_class);
+        println!("{:?}", arg_array);
+    }
+
+    env.call_static_method(main_class, "main", "([Ljava/lang/String;)V", &[(&arg_array).into()])?;
+    Ok(())
 }
 
 /// Create the JVM if possible
 fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
-    let path_getters = get_jvm_paths(launch_opts);
-    let count = path_getters.len();
-    for jvm_path_f in path_getters {
-        if let Some(jvm_path) = (jvm_path_f)(launch_opts) {
+    for jvm_path_fn in get_jvm_paths(launch_opts) {
+        if let Some(jvm_path) = jvm_path_fn(launch_opts) {
             // Make sure the system can find the needed dynamic libraries
             // not really needed now that the paths are fully resolved
             set_dynamic_library_lookup_loc(&jvm_path);
 
-            // This is needed for the lookup passed to with_libjvm
-            let path_getter = || Ok(jvm_path.as_path());
-
-            // Create JVM arguments
-            let args = make_jvm_args(launch_opts);
-            if args.is_err() {
-                message(
-                    "Failed to create JVM arguments.\n\
-                Please contact the developers or undo any changes to the configuration.",
-                );
-                return None;
-            }
-
-            if false {
-                if let Some(old_jvm) = get_prev_made_jvm(&jvm_path) {
-                    return Some(old_jvm);
+            if let Ok(args) = make_jvm_args(launch_opts) {
+                if DEBUG {
+                    println!("{:?}", launch_opts);
                 }
-            }
 
-            if DEBUG {
-                println!("{:?}", launch_opts);
-            }
-
-            // Create a new VM
-            let maybe_jvm = JavaVM::with_libjvm(args.unwrap(), path_getter);
-            match maybe_jvm {
-                Ok(vm) => return Some(vm),
-                Err(e) => {
-                    println!("{:?}", e);
-                    continue;
+                if let Ok(vm) = JavaVM::with_libjvm(args, || Ok(jvm_path.as_path())) {
+                    return Some(vm);
                 }
+            } else {
+                message("Failed to create JVM arguments.\n\
+                Please contact the developers or undo any changes to the configuration.");
             }
         }
     }
-    if count > 0 {
-        message(
-            "A valid Java installation was found, failed to start.\n\
-                Please check the launch arguments as they may be invalid.\n\
-                Please contact the developers.",
-        )
-    }
+    message("No valid Java installations or launch arguments found.");
     None
 }
 
@@ -199,39 +124,14 @@ fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
 
 #[cfg(not(target_os = "windows"))]
 fn set_dynamic_library_lookup_loc(_jvm_path: &PathBuf) {
-    // NO-OP at this time
+    // No-op for non-Windows systems
 }
 
 /// Calls `DestroyJavaVM` of JNI - it blocks until all Java threads are closed <br>
 /// See <https://docs.oracle.com/en/java/javase/17/docs/specs/jni/invocation.html#unloading-the-vm>
 fn close_jvm(jvm: JavaVM) {
-    unsafe {
-        jvm.destroy().unwrap();
-    }
-}
-
-/// Attempt to get the previously created JVM.<br>
-/// See <https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_getcreatedjavavms>
-fn get_prev_made_jvm(jvm_path: &PathBuf) -> Option<JavaVM> {
-    let mut jvm_count: i32 = 88;
-    let jvm_count_ptr: *mut i32 = &mut jvm_count;
-    let mut jvm_buf: *mut sys::JavaVM = std::ptr::null_mut();
-    let jvm_buf_ptr: *mut *mut sys::JavaVM = &mut jvm_buf;
-    unsafe {
-        let lib = libloading::Library::new(jvm_path).ok()?;
-        let f: libloading::Symbol<
-            unsafe extern "C" fn(
-                vm_buf: *mut *mut sys::JavaVM,
-                buf_len: jsize,
-                n_vms: *mut jsize,
-            ) -> jint,
-        > = lib.get(b"JNI_GetCreatedJavaVMs").ok()?;
-        let r = f(jvm_buf_ptr, 1, jvm_count_ptr);
-        if r == JNI_OK && jvm_count > 0 {
-            let jvm = JavaVM::from_raw(*jvm_buf_ptr).ok()?;
-            return Some(jvm);
-        }
-        None
+    if let Err(err) = unsafe { jvm.destroy() } {
+        eprintln!("Failed to close JVM: {:?}", err);
     }
 }
 
