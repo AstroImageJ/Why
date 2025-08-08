@@ -10,6 +10,7 @@ use crate::DEBUG;
 pub enum ZipSource {
     Mapped(Cursor<Mmap>),
     Buffered(BufReader<File>),
+    #[allow(dead_code)]
     File(File),
 }
 

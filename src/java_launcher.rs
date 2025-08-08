@@ -137,7 +137,7 @@ fn close_jvm(jvm: JavaVM) {
 
 /// Convert string args to the proper format and add to the launch args.<br>
 /// Sets the JVM to ignore unrecognized `-X` args and to expect calls to JNI 2
-fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs, JvmError> {
+fn make_jvm_args(launch_opts: &LaunchOpts) -> Result<InitArgs<'_>, JvmError> {
     let mut jvm_args = InitArgsBuilder::new()
         .version(JNIVersion::V2) // No touchy or things breaky
         .ignore_unrecognized(true);
