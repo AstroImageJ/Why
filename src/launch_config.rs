@@ -205,11 +205,6 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
 
     options.push(format!("-Djpackage.app-path={}", get_exec_path()));
 
-    #[cfg(target_os = "macos")]
-    {
-        options.push("-XstartOnFirstThread");
-    }
-
     if classpath.len() > 0 {
         options.push(format!("-Djava.class.path={}", classpath.join(SEPARATOR)));
     }

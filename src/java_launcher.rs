@@ -1,5 +1,4 @@
 use jni::{InitArgs, InitArgsBuilder, JNIVersion, JavaVM, JvmError};
-use std::iter::once;
 use std::path::PathBuf;
 
 use crate::file_handler::get_jvm_paths;
@@ -110,6 +109,7 @@ fn try_launch_jvm(launch_opts: &LaunchOpts) -> Option<JavaVM> {
 /// see: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setdlldirectoryw
 #[cfg(target_os = "windows")]
 fn set_dynamic_library_lookup_loc(jvm_path: &PathBuf) {
+    use std::iter::once;
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
     if let Some(jvm_dll_folder) = jvm_path.parent() {

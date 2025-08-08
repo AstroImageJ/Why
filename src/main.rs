@@ -19,6 +19,8 @@ fn main() {
         println!("Launcher starting!");
     }
 
+    pre_launch();
+
     correct_directory();
 
     launch();
@@ -82,5 +84,36 @@ fn correct_directory() {
         if let Some(exe_home) = exe_home.parent() {
             let _ = env::set_current_dir(exe_home);
         }
+    }
+}
+
+fn pre_launch() {
+    #[cfg(target_os = "windows")]
+    {
+        // Dpi awareness is set in the manifest, see build.rs
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Recreate -XstartOnFirstThread JVM option, with hack to bypass it
+        // https://github.com/openjdk/jdk/blob/master/src/java.base/macosx/native/libjli/java_md_macosx.m#L877
+        // https://github.com/openjdk/jdk/blob/master/src/java.desktop/macosx/native/libawt_lwawt/awt/LWCToolkit.m#L798
+        {
+            if env::var_os("HACK_IGNORE_START_ON_FIRST_THREAD").is_some() {
+                return;
+            }
+
+            let pid = std::process::id();
+            let key = format!("JAVA_STARTED_ON_FIRST_THREAD_{}", pid);
+
+            unsafe {
+                env::set_var(key, "1");
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+
     }
 }
