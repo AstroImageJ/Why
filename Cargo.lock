@@ -8,6 +8,7 @@ version = "2.0.0"
 dependencies = [
  "dirs",
  "dunce",
+ "embed-manifest",
  "jni",
  "memmap2",
  "walkdir",
@@ -215,6 +216,12 @@ name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+
+[[package]]
+name = "embed-manifest"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41cd446c890d6bed1d8b53acef5f240069ebef91d6fae7c5f52efe61fe8b5eae"
 
 [[package]]
 name = "equivalent"
