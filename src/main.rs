@@ -1,7 +1,7 @@
 use crate::display_handler::message;
 use crate::file_handler::get_app_dir_path;
 use crate::java_launcher::{create_and_run_jvm, LaunchOpts};
-use crate::launch_config::{parse_config, process_config};
+use crate::launch_config::read_config;
 use std::env;
 
 mod display_handler;
@@ -45,15 +45,10 @@ fn launch() {
 
     // Build launch opts
     let mut launch_options = LaunchOpts {
-        config: process_config(&parse_config(cfg_path).unwrap()),
+        config: read_config(cfg_path).unwrap(),
         jvm_opts: vec![],
-        program_opts: env::args().collect(), // Forward launch args to the app
+        program_opts: env::args().skip(1).collect(), // Forward launch args to the app
     };
-
-    // The first element is the launcher path, no need to pass it on
-    if launch_options.program_opts.len() >= 1 {
-        launch_options.program_opts.remove(0);
-    }
 
     // Forward jvm options to primary config struct
     launch_options

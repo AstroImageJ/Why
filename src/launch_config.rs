@@ -35,6 +35,57 @@ pub struct LaunchConfig {
     pub program_opts: Vec<String>,
 }
 
+/// Reads and parses a configuration file, optionally merging it with a secondary configuration
+/// if available. The secondary configuration takes precedence over the primary when conflicts occur.
+pub fn read_config<P: AsRef<Path>>(path: P) -> io::Result<LaunchConfig> {
+    let primary = parse_config(&path)?;
+    let cfg_name = path.as_ref().file_stem().and_then(|s| s.to_str());
+
+    if cfg_name.is_some() && dirs::preference_dir().is_some() {
+        let cfg_name = cfg_name.unwrap();
+        // On windows this path overlaps with where jpackage looks for the config,
+        // on other platforms this differs from jpackage
+        // See https://bugs.openjdk.org/browse/JDK-8287060
+        let secondary_path = dirs::preference_dir().unwrap()
+            .join(cfg_name)
+            .join(cfg_name)
+            .with_file_name(cfg_name)
+            .with_extension("cfg");
+
+        if DEBUG {
+            println!("secondary_path: {:?}", secondary_path);
+        }
+
+        if secondary_path.exists() {
+            let secondary = parse_config(&secondary_path)?;
+
+            // Merge the two configs, with secondary taking precedence.
+            // While merging vectors, avoid inserting duplicates.
+            let mut merged = primary.clone();
+            for (section_name, section) in secondary.iter() {
+                for (key, values) in section.iter() {
+                    let entry_vec = merged
+                        .entry(section_name.clone())
+                        .or_insert_with(Section::new)
+                        .entry(key.clone())
+                        .or_default();
+
+                    // Avoid inserting duplicates
+                    for v in values {
+                        if !entry_vec.contains(v) {
+                            entry_vec.push(v.clone());
+                        }
+                    }
+                }
+            }
+
+            return Ok(process_config(&merged))
+        }
+    }
+
+    Ok(process_config(&primary))
+}
+
 /// Parse an INI‑style file at `path` into a `Config`,
 /// preserving duplicate keys as multiple values.
 /// See https://github.com/openjdk/jdk/blob/master/src/jdk.jpackage/share/native/applauncher/CfgFile.cpp#L198
@@ -114,8 +165,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         }
 
         if let Some(main_jar) = app_sec.get("app.mainjar") {
-            assert_eq!(main_jar.len(), 1);
-            match read_manifest(&PathBuf::from(main_jar[0].clone())) {
+            match read_manifest(&PathBuf::from(main_jar.last().unwrap().clone())) {
                 Ok(manifest) => {
                     let main_sec = manifest[&None].clone();
 
@@ -162,8 +212,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         }
 
         if let Some(mc) = app_sec.get("app.mainclass") {
-            assert_eq!(mc.len(), 1);
-            main_class = Some(mc[0].clone());
+            main_class = Some(mc.last().unwrap().clone());
         }
 
         if let Some(main_module) = app_sec.get("app.mainmodule") {
@@ -177,8 +226,7 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         }
 
         if let Some(rt) = app_sec.get("app.runtime") {
-            assert_eq!(rt.len(), 1);
-            runtime = Some(PathBuf::from(rt[0].clone()));
+            runtime = Some(PathBuf::from(rt.last().unwrap()));
         } else {
             runtime = Some(get_default_runtime_path());
         }
