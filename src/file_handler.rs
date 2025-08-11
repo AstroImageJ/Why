@@ -365,6 +365,36 @@ fn read_class_version_to_java<R: Read>(mut reader: R) -> Option<u16> {
     }
 }
 
+pub fn get_config_overlay_path(root_name: Option<&str>) -> Option<PathBuf> {
+    let root_name = root_name?;
+    
+    #[cfg(target_os = "windows")]
+    {
+        return Some(
+            dirs::config_dir()?
+                .join(root_name)
+                .join(format!("{}_Overlay.cfg", root_name))
+        );
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return Some(
+            dirs::home_dir()?
+                .join(".local")
+                .join(root_name.to_ascii_lowercase())
+                .join(format!("{}_Overlay.cfg", root_name))
+        );
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return Some(
+            dirs::config_dir()?
+                .join(root_name)
+                .join(format!("{}_Overlay.cfg", root_name))
+        );
+    }
+}
+
 /// The path to the `app` folder.
 pub fn get_app_dir_path() -> PathBuf {
     #[cfg(target_os = "windows")]

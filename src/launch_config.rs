@@ -1,6 +1,6 @@
 use crate::file_handler::{
-    get_app_dir_path, get_app_image_root, get_default_runtime_path, get_exec_path,
-    get_java_version_of_main,
+    get_app_dir_path, get_app_image_root, get_config_overlay_path,
+    get_default_runtime_path, get_exec_path, get_java_version_of_main
 };
 use crate::manifest_handler::read_manifest;
 use crate::DEBUG;
@@ -39,19 +39,9 @@ pub struct LaunchConfig {
 /// if available. The secondary configuration takes precedence over the primary when conflicts occur.
 pub fn read_config<P: AsRef<Path>>(path: P) -> io::Result<LaunchConfig> {
     let primary = parse_config(&path)?;
-    let cfg_name = path.as_ref().file_stem().and_then(|s| s.to_str());
+    let root_name = path.as_ref().file_stem().and_then(|s| s.to_str());
 
-    if cfg_name.is_some() && dirs::preference_dir().is_some() {
-        let cfg_name = cfg_name.unwrap();
-        // On windows this path overlaps with where jpackage looks for the config,
-        // on other platforms this differs from jpackage
-        // See https://bugs.openjdk.org/browse/JDK-8287060
-        let secondary_path = dirs::preference_dir().unwrap()
-            .join(cfg_name)
-            .join(cfg_name)
-            .with_file_name(cfg_name)
-            .with_extension("cfg");
-
+    if let Some(secondary_path) = get_config_overlay_path(root_name) {
         if DEBUG {
             println!("secondary_path: {:?}", secondary_path);
         }
