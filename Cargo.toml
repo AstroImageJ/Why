@@ -21,6 +21,9 @@ memmap2 = "0.9.7"
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = {version = "0.60.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader"]}
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10.1"
+
 # From https://github.com/johnthagen/min-sized-rust
 [profile.release]
 strip = true  # Automatically strip symbols from the binary.

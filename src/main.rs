@@ -65,7 +65,69 @@ fn launch() {
     }
 
     // Run the app
-    create_and_run_jvm(&launch_options)
+    #[cfg(not(target_os = "macos"))]
+    {
+        pre_jvm_launch();
+        create_and_run_jvm(&launch_options);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // More complicated handling so that AWT/Swing can run on the main thread
+        // and Apple events can be handled
+        use std::thread;
+
+        // On macOS, we need to run the JVM in a separate thread
+        thread::spawn(move || {
+            //pre_jvm_launch(); // Has to be disabled for AWT to work for some reason
+            create_and_run_jvm(&launch_options);
+        });
+
+        // Parks the thread to handle apple events and AWt as the gui needs to run on
+        // the main thread on mac.
+        // This is code from Roast, licensed under Apache 2.0, which adapts code from the JDK's JLI
+        // library.
+        // https://github.com/fourlastor-alexandria/roast
+        {
+            use core_foundation::date::CFAbsoluteTime;
+            use core_foundation::runloop::{
+                kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopRunResult, CFRunLoopTimer,
+                CFRunLoopTimerRef,
+            };
+            use std::{ffi::c_void, ptr, time::Duration};
+
+            extern "C" fn dummy_timer(_: CFRunLoopTimerRef, _: *mut c_void) {}
+
+            // Create a dummy timer with a far future fire time
+            let timer = CFRunLoopTimer::new(
+                CFAbsoluteTime::from(1.0e5), // Fire time
+                0.0,                         // Interval
+                0,                           // Flags
+                0,                           // Order
+                dummy_timer,                 // Dummy callback
+                ptr::null_mut(),
+            );
+
+            unsafe {
+                // Add the timer to the current run loop in default mode
+                let current_run_loop = CFRunLoop::get_current();
+                current_run_loop.add_timer(&timer, kCFRunLoopDefaultMode);
+
+                // Park the thread in the run loop
+                loop {
+                    let result = CFRunLoop::run_in_mode(
+                        kCFRunLoopDefaultMode,
+                        Duration::from_secs_f64(1.0e5),
+                        false,
+                    );
+
+                    if result == CFRunLoopRunResult::Finished {
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// This makes sure the current working directory is the exe's home.<br>
@@ -86,6 +148,24 @@ fn pre_launch() {
     #[cfg(target_os = "windows")]
     {
         // Dpi awareness is set in the manifest, see build.rs
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+
+    }
+}
+
+#[allow(dead_code)]
+fn pre_jvm_launch() {
+    #[cfg(target_os = "windows")]
+    {
+
     }
 
     #[cfg(target_os = "macos")]
