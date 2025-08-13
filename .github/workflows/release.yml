@@ -1,0 +1,49 @@
+name: release.yml
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Perform dry run'
+        required: true
+        type: boolean
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-assets:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            build-tool: cargo-zigbuild
+          - target: x86_64-pc-windows-msvc
+            os: ubuntu-latest
+            build-tool: cargo-zigbuild
+          - target: universal-apple-darwin
+            os: macos-latest
+            build-tool: cargo-zigbuild
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: JavaLauncher
+          target: ${{ matrix.target }}
+          build-tool: ${{ matrix.build-tool }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run-intended: ${{ github.event.inputs.dry_run }}
