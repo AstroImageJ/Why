@@ -34,6 +34,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 'latest'
+      - name: Install zigbuild
+        run: |
+          cargo install --locked cargo-zigbuild
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: JavaLauncher
