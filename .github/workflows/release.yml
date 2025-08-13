@@ -7,30 +7,26 @@ on:
   push:
     tags:
       - '*'
+  workflow_dispatch:
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/create-gh-release-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  upload-assets:
-    needs: create-release
+  build:
     strategy:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             build-tool: cargo-zigbuild
+            artifactExt: ''
           - target: x86_64-pc-windows-msvc
-            os: ubuntu-latest
-            build-tool: cargo-zigbuild
+            os: windows-latest
+            build-tool: cargo
+            artifactExt: '.exe'
           - target: universal-apple-darwin
             os: macos-latest
             build-tool: cargo-zigbuild
+            artifactExt: ''
+      fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -40,10 +36,61 @@ jobs:
       - name: Install zigbuild
         run: |
           cargo install --locked cargo-zigbuild
-      - uses: taiki-e/upload-rust-binary-action@v1
+
+      # Install targets
+      - name: Install targets mac
+        if: matrix.runner == 'macos-latest'
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+      - name: Install targets linux
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+      - name: Install targets windows
+        if: matrix.runner == 'windows-latest'
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+
+      # Build
+      - run: ${{ matrix.build-tool }} build --release --target ${{ matrix.target }} --bin JavaLauncher
+      - name: Upload binary
+        id: upload
+        uses: actions/upload-artifact@v4
         with:
-          bin: JavaLauncher
-          target: ${{ matrix.target }}
-          build-tool: ${{ matrix.build-tool }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          dry-run-intended: ${{ github.event.inputs.dry_run }}
+          name: JavaLauncher-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/JavaLauncher${{ matrix.artifactExt }}
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact }}
+  upload:
+    name: Upload Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download executable (linux-x64)
+        uses: actions/download-artifact@v4
+        with:
+          name: JavaLauncher-x86_64-unknown-linux-gnu
+        continue-on-error: true
+
+      - name: Download executable (mac-universal)
+        uses: actions/download-artifact@v4
+        with:
+          name: JavaLauncher-universal-apple-darwin
+        continue-on-error: true
+
+      - name: Download executable (windows-x64)
+        uses: actions/download-artifact@v4
+        with:
+          name: JavaLauncher-x86_64-pc-windows-msvc
+        continue-on-error: true
+      - name: Create release
+        if: ${{ false }}
+        # https://cli.github.com/manual/gh_release_create
+        shell: bash
+        run: |
+          for f in ./*; do FILES+=" $f"; done
+          gh release create ${{ steps.vars.outputs.VERSION }} $FILES --fail-on-no-commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
