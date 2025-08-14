@@ -1,3 +1,7 @@
+// Disable windows console being opened when using the GNU target
+// https://doc.rust-lang.org/reference/runtime.html#the-windows_subsystem-attribute
+#![windows_subsystem = "windows"]
+
 use crate::display_handler::message;
 use crate::file_handler::get_app_dir_path;
 use crate::java_launcher::{create_and_run_jvm, LaunchOpts};

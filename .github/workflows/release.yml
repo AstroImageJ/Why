@@ -11,99 +11,75 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            build-tool: cargo-zigbuild
-            artifactExt: ''
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            build-tool: cargo
-            artifactExt: '.exe'
-          - target: universal2-apple-darwin
-            os: macos-latest
-            build-tool: cargo-zigbuild
-            artifactExt: ''
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: mlugg/setup-zig@v2
         with:
-          version: 'latest'
+          version: '0.13.0'
 
       - name: Install zigbuild
         run: |
           cargo install --locked cargo-zigbuild
 
-      - name: Setup SDK for mac
-        if: ${{ matrix.os == 'macos-latest' }}
-        env:
-          SDK: MacOSX11.3.sdk
-        run: |
-          set -e
-          curl -sqL https://github.com/joseluisq/macosx-sdks/releases/download/11.3/$SDK.tar.xz | tar -Jx
-          export SDKROOT=$PWD/$SDK
-
-      # Install targets
-      - name: Install targets mac
-        if: ${{ matrix.os == 'macos-latest' }}
+      - name: Install targets
         run: |
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
-      - name: Install targets linux
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
+          rustup target add x86_64-pc-windows-gnu
           rustup target add x86_64-unknown-linux-gnu
-      - name: Install targets windows
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: |
-          rustup target add x86_64-pc-windows-msvc
 
-      # Build
-      - run: ${{ matrix.build-tool }} build --release --target ${{ matrix.target }} --bin JavaLauncher
+      - name: Setup SDK for mac
         env:
-          SDK: MacOSX11.3.sdk
-      - name: Upload binary
-        id: upload
+          SDKVERSION: 15.5
+          SDK: MacOSX15.5.sdk
+        run: |
+          set -e
+          curl -sqL "https://github.com/joseluisq/macosx-sdks/releases/download/$SDKVERSION/MacOSX$SDKVERSION.sdk.tar.xz" | tar -J -x
+          export SDKROOT=$PWD/MacOSX$SDKVERSION.sdk
+
+      - name: Build
+        run: |
+          cargo zigbuild --target x86_64-unknown-linux-gnu --release
+          cargo zigbuild --target x86_64-pc-windows-gnu --release
+          cargo zigbuild --target universal2-apple-darwin --release
+          cargo zigbuild --target x86_64-apple-darwin --release
+          cargo zigbuild --target aarch64-apple-darwin --release
+
+      # Upload artifacts
+      - name: Upload x86_64-unknown-linux-gnu
         uses: actions/upload-artifact@v4
         with:
-          name: JavaLauncher-${{ matrix.target }}
-          path: |
-            target/${{ matrix.target }}/release/JavaLauncher${{ matrix.artifactExt }}
-    outputs:
-      artifact: ${{ steps.upload.outputs.artifact }}
-  upload:
-    name: Upload Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download executable (linux-x64)
-        uses: actions/download-artifact@v4
-        with:
           name: JavaLauncher-x86_64-unknown-linux-gnu
-        continue-on-error: true
-
-      - name: Download executable (mac-universal)
-        uses: actions/download-artifact@v4
+          if-no-files-found: error
+          path: |
+            target/x86_64-unknown-linux-gnu/release/JavaLauncher
+      - name: Upload x86_64-pc-windows-gnu
+        uses: actions/upload-artifact@v4
+        with:
+          name: JavaLauncher-x86_64-pc-windows-gnu
+          if-no-files-found: error
+          path: |
+            target/x86_64-pc-windows-gnu/release/JavaLauncher.exe
+      - name: Upload universal2-apple-darwin
+        uses: actions/upload-artifact@v4
         with:
           name: JavaLauncher-universal2-apple-darwin
-        continue-on-error: true
-
-      - name: Download executable (windows-x64)
-        uses: actions/download-artifact@v4
+          if-no-files-found: error
+          path: |
+            target/universal2-apple-darwin/release/JavaLauncher
+      - name: Upload x86_64-apple-darwin
+        uses: actions/upload-artifact@v4
         with:
-          name: JavaLauncher-x86_64-pc-windows-msvc
-        continue-on-error: true
-      - name: Create release
-        if: ${{ false }}
-        # https://cli.github.com/manual/gh_release_create
-        shell: bash
-        run: |
-          for f in ./*; do FILES+=" $f"; done
-          gh release create ${{ steps.vars.outputs.VERSION }} $FILES --fail-on-no-commits
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: JavaLauncher-x86_64-apple-darwin
+          if-no-files-found: error
+          path: |
+            target/x86_64-apple-darwin/release/JavaLauncher
+      - name: Upload aarch64-apple-darwin
+        uses: actions/upload-artifact@v4
+        with:
+          name: JavaLauncher-aarch64-apple-darwin
+          if-no-files-found: error
+          path: |
+            target/aarch64-apple-darwin/release/JavaLauncher
