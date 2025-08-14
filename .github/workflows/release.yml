@@ -39,10 +39,14 @@ jobs:
         run: |
           cargo install --locked cargo-zigbuild
 
-      - uses: maxim-lobanov/setup-xcode@v1
+      - name: Setup SDK for mac
         if: ${{ matrix.os == 'macos-latest' }}
-        with:
-          xcode-version: latest-stable
+        env:
+          SDK: MacOSX11.3.sdk
+        run: |
+          set -e
+          curl -sqL https://github.com/joseluisq/macosx-sdks/releases/download/11.3/$SDK.tar.xz | tar -Jx
+          export SDKROOT=$PWD/$SDK
 
       # Install targets
       - name: Install targets mac
@@ -61,6 +65,8 @@ jobs:
 
       # Build
       - run: ${{ matrix.build-tool }} build --release --target ${{ matrix.target }} --bin JavaLauncher
+        env:
+          SDK: MacOSX11.3.sdk
       - name: Upload binary
         id: upload
         uses: actions/upload-artifact@v4
