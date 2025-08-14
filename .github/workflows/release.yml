@@ -30,12 +30,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: mlugg/setup-zig@v2
         with:
           version: 'latest'
+
       - name: Install zigbuild
         run: |
           cargo install --locked cargo-zigbuild
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: ${{ matrix.os == 'macos-latest' }}
+        with:
+          xcode-version: latest-stable
 
       # Install targets
       - name: Install targets mac
