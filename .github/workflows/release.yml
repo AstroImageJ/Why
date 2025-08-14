@@ -13,7 +13,6 @@ jobs:
   build:
     env:
       SDKVERSION: 15.5
-      SDKROOT: /opt/MacOSX${{ env.SDKVERSION }}.sdk
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,9 +46,9 @@ jobs:
         run: |
           cargo zigbuild --target x86_64-unknown-linux-gnu --release
           cargo zigbuild --target x86_64-pc-windows-gnu --release
-          cargo zigbuild --target universal2-apple-darwin --release
-          cargo zigbuild --target x86_64-apple-darwin --release
-          cargo zigbuild --target aarch64-apple-darwin --release
+          SDKROOT="/opt/MacOSX$SDKVERSION.sdk" cargo zigbuild --target universal2-apple-darwin --release
+          SDKROOT="/opt/MacOSX$SDKVERSION.sdk" cargo zigbuild --target x86_64-apple-darwin --release
+          SDKROOT="/opt/MacOSX$SDKVERSION.sdk" cargo zigbuild --target aarch64-apple-darwin --release
 
       # Upload artifacts
       - name: Upload x86_64-unknown-linux-gnu
