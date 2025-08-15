@@ -63,18 +63,10 @@ jobs:
 
       - name: Build
         run: |
-          cargo zigbuild --target universal2-apple-darwin --release
-          cargo zigbuild --target x86_64-apple-darwin --release
-          cargo zigbuild --target aarch64-apple-darwin --release
+          cargo build --target x86_64-apple-darwin --release
+          cargo build --target aarch64-apple-darwin --release
 
       # Upload artifacts
-      - name: Upload universal2-apple-darwin
-        uses: actions/upload-artifact@v4
-        with:
-          name: JavaLauncher-universal2-apple-darwin
-          if-no-files-found: error
-          path: |
-            target/universal2-apple-darwin/release/JavaLauncher
       - name: Upload x86_64-apple-darwin
         uses: actions/upload-artifact@v4
         with:
