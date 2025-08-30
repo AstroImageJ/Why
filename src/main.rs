@@ -7,6 +7,7 @@ use crate::file_handler::get_app_dir_path;
 use crate::java_launcher::{create_and_run_jvm, LaunchOpts};
 use crate::launch_config::read_config;
 use std::env;
+use std::thread;
 
 mod display_handler;
 mod file_handler;
@@ -68,25 +69,21 @@ fn launch() {
         println!("{:?}", launch_options);
     }
 
-    // Run the app
-    #[cfg(not(target_os = "macos"))]
-    {
+    // Using new thread as per https://docs.oracle.com/en/java/javase/24/docs/specs/jni/invocation.html#creating-the-vm
+    let t = thread::spawn(move || {
         pre_jvm_launch();
         create_and_run_jvm(&launch_options);
+    });
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        t.join().expect("JVM thread failed to join");
     }
 
+    // More complicated handling so that AWT/Swing can run on the main thread
+    // and Apple events can be handled
     #[cfg(target_os = "macos")]
     {
-        // More complicated handling so that AWT/Swing can run on the main thread
-        // and Apple events can be handled
-        use std::thread;
-
-        // On macOS, we need to run the JVM in a separate thread
-        thread::spawn(move || {
-            //pre_jvm_launch(); // Has to be disabled for AWT to work for some reason
-            create_and_run_jvm(&launch_options);
-        });
-
         // Parks the thread to handle apple events and AWt as the gui needs to run on
         // the main thread on mac.
         // This is code from Roast, licensed under Apache 2.0, which adapts code from the JDK's JLI
@@ -177,7 +174,7 @@ fn pre_jvm_launch() {
         // Recreate -XstartOnFirstThread JVM option, with hack to bypass it
         // https://github.com/openjdk/jdk/blob/master/src/java.base/macosx/native/libjli/java_md_macosx.m#L877
         // https://github.com/openjdk/jdk/blob/master/src/java.desktop/macosx/native/libawt_lwawt/awt/LWCToolkit.m#L798
-        {
+        /*{ // Has to be disabled for AWT to work for some reason
             if env::var_os("HACK_IGNORE_START_ON_FIRST_THREAD").is_some() {
                 return;
             }
@@ -188,7 +185,7 @@ fn pre_jvm_launch() {
             unsafe {
                 env::set_var(key, "1");
             }
-        }
+        }*/
     }
 
     #[cfg(target_os = "linux")]
