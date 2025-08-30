@@ -14,9 +14,9 @@ embed-manifest = "1.4.0"
 jni = { version = "0.21.1", features = ["invocation"] }
 walkdir = "2.5.0"
 dirs = "6.0.0"
-zip = "4.3.0"
+zip = "4.5.0"
 dunce = "1.0.5"
-memmap2 = "0.9.7"
+memmap2 = "0.9.8"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = {version = "0.60.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader"]}
