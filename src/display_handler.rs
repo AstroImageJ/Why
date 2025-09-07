@@ -16,7 +16,7 @@ fn print_message(msg: &str) -> Result<(), Error> {
         if ret == 0 {
             Err(Error::last_os_error())
         } else {
-            Ok(ret)
+            Ok(())
         }
     }
 
