@@ -1,7 +1,4 @@
-use crate::file_handler::{
-    get_app_dir_path, get_app_image_root, get_config_overlay_path,
-    get_default_runtime_path, get_exec_path, get_java_version_of_main
-};
+use crate::file_handler::{get_app_dir_path, get_app_image_root, get_config_overlay_path, get_default_runtime_path, get_exec_path, get_java_version_of_main, get_logs_folder};
 use crate::manifest_handler::read_manifest;
 use crate::DEBUG;
 use std::path::PathBuf;
@@ -38,8 +35,9 @@ pub struct LaunchConfig {
 /// Reads and parses a configuration file, optionally merging it with a secondary configuration
 /// if available. The secondary configuration takes precedence over the primary when conflicts occur.
 pub fn read_config<P: AsRef<Path>>(path: P) -> io::Result<LaunchConfig> {
-    let primary = parse_config(&path)?;
     let root_name = path.as_ref().file_stem().and_then(|s| s.to_str());
+
+    let primary = parse_config(&path, root_name)?;
 
     if let Some(secondary_path) = get_config_overlay_path(root_name) {
         if DEBUG {
@@ -47,7 +45,7 @@ pub fn read_config<P: AsRef<Path>>(path: P) -> io::Result<LaunchConfig> {
         }
 
         if secondary_path.exists() {
-            let secondary = parse_config(&secondary_path)?;
+            let secondary = parse_config(&secondary_path, root_name)?;
 
             // Merge the two configs, with secondary taking precedence.
             // While merging vectors, avoid inserting duplicates.
@@ -79,7 +77,7 @@ pub fn read_config<P: AsRef<Path>>(path: P) -> io::Result<LaunchConfig> {
 /// Parse an INI‑style file at `path` into a `Config`,
 /// preserving duplicate keys as multiple values.
 /// See https://github.com/openjdk/jdk/blob/master/src/jdk.jpackage/share/native/applauncher/CfgFile.cpp#L198
-pub fn parse_config<P: AsRef<Path>>(path: P) -> io::Result<JPackageLaunchConfig> {
+pub fn parse_config<P: AsRef<Path>>(path: P, root_name: Option<&str>) -> io::Result<JPackageLaunchConfig> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut config = JPackageLaunchConfig::new();
@@ -93,7 +91,9 @@ pub fn parse_config<P: AsRef<Path>>(path: P) -> io::Result<JPackageLaunchConfig>
         let line = line
             .replace("$APPDIR", get_app_dir_path().to_str().unwrap())
             .replace("$ROOTDIR", get_app_image_root().to_str().unwrap())
-            .replace("$BINDIR", std::env::current_exe()?.parent().unwrap().to_str().unwrap());
+            .replace("$BINDIR", std::env::current_exe()?.parent().unwrap().to_str().unwrap())
+            .replace("$LOGDIR", get_logs_folder(root_name).unwrap().to_str().unwrap())
+            ;
 
         // Skip blank lines and comments
         // Jpackage only supports ; for comments

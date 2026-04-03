@@ -365,6 +365,36 @@ fn read_class_version_to_java<R: Read>(mut reader: R) -> Option<u16> {
     }
 }
 
+pub fn get_logs_folder(root_name: Option<&str>) -> Option<PathBuf> {
+    let root_name = root_name?;
+
+    #[cfg(target_os = "windows")]
+    {
+        return Some(
+            dirs::data_local_dir()?
+                .join(root_name)
+                .join("Logs")
+        );
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return Some(
+            dirs::state_dir()?
+                .join(root_name.to_ascii_lowercase())
+                .join("logs")
+        );
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return Some(
+            dirs::config_dir()?
+                .parent()?
+                .join("Logs")
+                .join(root_name)
+        );
+    }
+}
+
 pub fn get_config_overlay_path(root_name: Option<&str>) -> Option<PathBuf> {
     let root_name = root_name?;
     
