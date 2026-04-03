@@ -339,13 +339,6 @@ fn is_zgc_supported(min_java: Option<u16>) -> bool {
 fn has_conflicting_gcs(java_opts: &[String]) -> bool {
     //todo check for options only available on other GCs
     return java_opts.iter().any(|opt| {
-        return match opt.as_str() {
-            "-XX:+UseSerialGC" => true,
-            "-XX:+UseG1GC" => true,
-            "-XX:+UseParallelGC" => true,
-            // Don't check for ZGC as we'll be adding it if this passes
-            "-XX:+UseZGC" => true,
-            _ => false,
-        };
+        return opt.starts_with("-XX:+Use") && opt.ends_with("GC");
     })
 }
