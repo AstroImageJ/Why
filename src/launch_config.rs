@@ -253,12 +253,99 @@ pub fn process_config(cfg: &JPackageLaunchConfig) -> LaunchConfig {
         lookup_path = classpath.clone();
     }
 
+    let min_java = get_java_version_of_main(&main_class, &lookup_path);
+
+    if let Some(why_options) = cfg.get("Why") {
+        if let Some(why) = why_options.get("use-zgc") {
+            if let Some(use_zgc) = why.last() {
+                if "true".eq_ignore_ascii_case(use_zgc) {
+                    if has_conflicting_gcs(&options) {
+                        println!("Conflicting GCs detected. ZGC will not be enabled.");
+                    } else if is_zgc_supported(min_java) {
+                        options.push("-XX:+UseZGC".to_string());
+                    } else {
+                        println!("ZGC is not supported on this platform. ZGC will not be enabled.");
+                    }
+                }
+            }
+        }
+    }
+
     return LaunchConfig {
         main_class: main_class.clone().unwrap(),
         runtime,
-        min_java: get_java_version_of_main(&main_class, &lookup_path),
+        min_java,
         java_opts: options.clone(),
         classpath,
         program_opts,
     };
+}
+
+/// Check the requirements are met for enabling ZGC.
+/// # [ZGC requirements](https://wiki.openjdk.java.net/display/zgc/Main#Main-SupportedPlatforms).
+///
+/// See: <https://wiki.openjdk.java.net/display/zgc/Main#Main-SupportedPlatforms>
+///
+/// ## Windows
+/// - Windows 10 or 2019 Windows server (version 1803 or later)
+///     - Windows 10 1803 is build 17134, see <https://learn.microsoft.com/en-us/windows/release-health/release-information>
+/// - Java 16
+///     - x64 has supported ZGC since Java 15
+///
+/// ## Linux
+/// - Java 18
+///     - x64 and Arm has supported ZGC since Java 15
+///
+/// ## macOS
+/// - Java 17
+///     - x64 has supported ZGC since Java 15
+fn is_zgc_supported(min_java: Option<u16>) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        let correct_java = if let Some(version) = min_java {
+            version >= 16
+        } else {
+            return false;
+        };
+
+        use windows_version::OsVersion;
+        return correct_java &&
+            OsVersion::current() >= OsVersion::new(10, 0, 0, 17134);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let correct_java = if let Some(version) = min_java {
+            version >= 18
+        } else {
+            return false;
+        };
+
+        //todo linux zgc large pages requires kernal >=4.7
+        //https://docs.oracle.com/en/java/javase/26/gctuning/z-garbage-collector.html#GUID-EF8B2CC4-7446-49C7-A2CF-68710DB1BF5F
+        return correct_java;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let correct_java = if let Some(version) = min_java {
+            version >= 17
+        } else {
+            return false;
+        };
+
+        return correct_java;
+    }
+}
+
+fn has_conflicting_gcs(java_opts: &[String]) -> bool {
+    //todo check for options only available on other GCs
+    return java_opts.iter().any(|opt| {
+        return match opt.as_str() {
+            "-XX:+UseSerialGC" => true,
+            "-XX:+UseG1GC" => true,
+            "-XX:+UseParallelGC" => true,
+            // Don't check for ZGC as we'll be adding it if this passes
+            "-XX:+UseZGC" => true,
+            _ => false,
+        };
+    })
 }
