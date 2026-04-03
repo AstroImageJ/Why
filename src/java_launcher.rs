@@ -25,6 +25,9 @@ pub fn create_and_run_jvm(launch_opts: &LaunchOpts) {
             Ok(mut env) => {
                 if let Err(e) = call_main_method(&mut env, launch_opts) {
                     eprintln!("Failed to invoke main method: {:?}", e);
+                    if env.exception_check().unwrap_or(false) {
+                        env.exception_describe().unwrap_or_default();
+                    }
                     message(
                         "Failed to start the app. Ensure the classname is valid and available on the classpath.",
                     );
