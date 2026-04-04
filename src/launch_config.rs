@@ -84,6 +84,10 @@ pub fn parse_config<P: AsRef<Path>>(path: P, root_name: Option<&str>) -> io::Res
     // Default section for keys before any [section]
     let mut current_section = String::from("default");
 
+    let log_dir = get_logs_folder(root_name)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or("$LOGDIR".to_string());
+
     for line in reader.lines() {
         let line = line?;
         let line = line.trim();
@@ -92,7 +96,7 @@ pub fn parse_config<P: AsRef<Path>>(path: P, root_name: Option<&str>) -> io::Res
             .replace("$APPDIR", get_app_dir_path().to_str().unwrap())
             .replace("$ROOTDIR", get_app_image_root().to_str().unwrap())
             .replace("$BINDIR", std::env::current_exe()?.parent().unwrap().to_str().unwrap())
-            .replace("$LOGDIR", get_logs_folder(root_name).unwrap().to_str().unwrap())
+            .replace("$LOGDIR", &log_dir)
             ;
 
         // Skip blank lines and comments
