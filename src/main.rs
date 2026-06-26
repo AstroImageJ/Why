@@ -33,13 +33,8 @@ fn main() {
 
 /// Setup the environment and launch the application
 fn launch() {
-    let cfg_path = get_app_dir_path().join(
-        env::current_exe()
-            .unwrap()
-            .with_extension("cfg")
-            .file_name()
-            .unwrap(),
-    );
+    // Limit to just AIJ's config
+    let cfg_path = get_app_dir_path().join("AstroImageJ.cfg");
 
     // Set current directory to app folder
     let _ = env::set_current_dir(get_app_dir_path());
