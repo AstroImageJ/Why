@@ -4,10 +4,13 @@ permissions:
   contents: write
 
 on:
-  push:
-    tags:
-      - '*'
   workflow_dispatch:
+    inputs:
+      windows_sign:
+        description: 'Sign Windows Package'
+        required: false
+        type: 'boolean'
+        default: true
 
 jobs:
   build-windows:
@@ -34,20 +37,16 @@ jobs:
           cargo build --target aarch64-pc-windows-msvc --release
 
       # Upload artifacts
-      - name: Upload x86_64-pc-windows-msvc
+      - name: Upload Windows Launchers
         uses: actions/upload-artifact@v7
+        id: upload
         with:
           name: JavaLauncher-x86_64-pc-windows-msvc
           if-no-files-found: error
           path: |
             target/x86_64-pc-windows-msvc/release/JavaLauncher.exe
-      - name: Upload aarch64-pc-windows-msvc
-        uses: actions/upload-artifact@v7
-        with:
-          name: JavaLauncher-aarch64-pc-windows-msvc
-          if-no-files-found: error
-          path: |
             target/aarch64-pc-windows-msvc/release/JavaLauncher.exe
+
   build-macos:
     runs-on: macos-latest
     steps:
@@ -90,6 +89,7 @@ jobs:
           if-no-files-found: error
           path: |
             target/aarch64-apple-darwin/release/JavaLauncher
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
