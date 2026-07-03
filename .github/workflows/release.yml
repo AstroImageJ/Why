@@ -26,10 +26,12 @@ jobs:
       - name: Install targets
         run: |
           rustup target add x86_64-pc-windows-msvc
+          rustup target add aarch64-pc-windows-msvc
 
       - name: Build
         run: |
           cargo build --target x86_64-pc-windows-msvc --release
+          cargo build --target aarch64-pc-windows-msvc --release
 
       # Upload artifacts
       - name: Upload x86_64-pc-windows-msvc
@@ -39,6 +41,13 @@ jobs:
           if-no-files-found: error
           path: |
             target/x86_64-pc-windows-msvc/release/JavaLauncher.exe
+      - name: Upload aarch64-pc-windows-msvc
+        uses: actions/upload-artifact@v4
+        with:
+          name: JavaLauncher-aarch64-pc-windows-msvc
+          if-no-files-found: error
+          path: |
+            target/aarch64-pc-windows-msvc/release/JavaLauncher.exe
   build-macos:
     runs-on: macos-latest
     steps:
