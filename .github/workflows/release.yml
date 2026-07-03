@@ -13,7 +13,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: mlugg/setup-zig@v2
         with:
@@ -35,14 +35,14 @@ jobs:
 
       # Upload artifacts
       - name: Upload x86_64-pc-windows-msvc
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaLauncher-x86_64-pc-windows-msvc
           if-no-files-found: error
           path: |
             target/x86_64-pc-windows-msvc/release/JavaLauncher.exe
       - name: Upload aarch64-pc-windows-msvc
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaLauncher-aarch64-pc-windows-msvc
           if-no-files-found: error
@@ -51,7 +51,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -77,14 +77,14 @@ jobs:
 
       # Upload artifacts
       - name: Upload x86_64-apple-darwin
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaLauncher-x86_64-apple-darwin
           if-no-files-found: error
           path: |
             target/x86_64-apple-darwin/release/JavaLauncher
       - name: Upload aarch64-apple-darwin
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaLauncher-aarch64-apple-darwin
           if-no-files-found: error
@@ -93,7 +93,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: mlugg/setup-zig@v2
         with:
@@ -115,14 +115,14 @@ jobs:
 
       # Upload artifacts
       - name: Upload x86_64-unknown-linux-gnu
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaLauncher-x86_64-unknown-linux-gnu
           if-no-files-found: error
           path: |
             target/x86_64-unknown-linux-gnu/release/JavaLauncher
       - name: Upload aarch64-unknown-linux-gnu
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaLauncher-aarch64-unknown-linux-gnu
           if-no-files-found: error
