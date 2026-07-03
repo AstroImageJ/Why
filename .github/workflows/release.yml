@@ -36,16 +36,23 @@ jobs:
           cargo build --target x86_64-pc-windows-msvc --release
           cargo build --target aarch64-pc-windows-msvc --release
 
+      - name: Stage Windows Launchers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release/windows | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/JavaLauncher.exe release/windows/JavaLauncher-x86_64-pc-windows-msvc.exe
+          Copy-Item target/aarch64-pc-windows-msvc/release/JavaLauncher.exe release/windows/JavaLauncher-aarch64-pc-windows-msvc.exe
+
       # Upload artifacts
       - name: Upload Windows Launchers
         uses: actions/upload-artifact@v7
         id: upload
         with:
-          name: JavaLauncher-x86_64-pc-windows-msvc
+          name: Windows-Launchers
           if-no-files-found: error
           path: |
-            target/x86_64-pc-windows-msvc/release/JavaLauncher.exe
-            target/aarch64-pc-windows-msvc/release/JavaLauncher.exe
+            release/windows/JavaLauncher-x86_64-pc-windows-msvc.exe
+            release/windows/JavaLauncher-aarch64-pc-windows-msvc.exe
 
   build-macos:
     runs-on: macos-latest
