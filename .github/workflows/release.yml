@@ -54,6 +54,29 @@ jobs:
             release/windows/JavaLauncher-x86_64-pc-windows-msvc.exe
             release/windows/JavaLauncher-aarch64-pc-windows-msvc.exe
 
+      - name: Windows Signing
+        if: github.event.inputs.windows_sign == 'true'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
+          project-slug: 'AstroImageJ_Why'
+          signing-policy-slug: 'test-signing'
+          github-artifact-id: '${{ steps.upload.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signpath/output'
+          wait-for-completion-timeout-in-seconds: 900
+          service-unavailable-timeout-in-seconds: 900
+
+      - name: Upload Signed Windows Installer
+        if: github.event.inputs.windows_sign == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          retention-days: 7
+          path: signpath/output
+          name: signed-windows-installers
+          if-no-files-found: error
+
   build-macos:
     runs-on: macos-latest
     steps:
