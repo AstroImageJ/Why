@@ -9,6 +9,7 @@ license = "LGPL-3.0"
 
 [build-dependencies]
 embed-manifest = "1.4.0"
+winres = "0.1"
 
 [dependencies]
 jni = { version = "0.21.1", features = ["invocation"] }
