@@ -14,6 +14,10 @@ fn main() {
 
         let mut res = winres::WindowsResource::new();
         res.set_icon("aij.ico");
+        res.set("FileDescription", "AstroImageJ");
+        res.set("ProductName", "AstroImageJ");
+        res.set("InternalName", "AstroImageJ");
+        res.set("OriginalFilename", "AstroImageJ.exe");
         res.compile().expect("failed to compile resources");
     }
 }
