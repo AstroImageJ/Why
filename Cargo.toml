@@ -14,8 +14,8 @@ winres = "0.1"
 [dependencies]
 jni = { version = "0.21.1", features = ["invocation"] }
 walkdir = "2.5.0"
-dirs = "6.0.0"
-zip = "5.0.0"
+dirs = "7.0.0"
+zip = "9.0.5"
 dunce = "1.0.5"
 memmap2 = "0.9.8"
 
